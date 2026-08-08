@@ -3,9 +3,18 @@
 How the atelier site moves from content-in-the-repository to content-in-a-database,
 without giving up the thing that makes it fast.
 
-This plan spans both repositories. CAFA-Admin becomes the backend; CAFA-Template
+This spans both repositories. CAFA-Admin becomes the backend; CAFA-Template
 becomes a frontend that gets its content from that backend instead of from files
 checked in beside its code.
+
+> **Status: implemented.** All five phases are in the code. What still needs
+> hands on a Cloudflare account is the provisioning in §8 — creating the
+> database and bucket, running the seed and the upload, setting the secrets and
+> wiring the two deploy hooks. Three things ended up different from the plan as
+> first written, and are described where they occur: the build-time fetch is a
+> prebuild script rather than a fetch inside `lib/content.ts` (§1), the preview
+> survived instead of being dropped with the draft branch (§7), and the nav's
+> labels became editable copy (§4).
 
 ---
 
@@ -36,10 +45,16 @@ what the design *is*. Runtime fetching breaks them structurally, not marginally:
   of it derives from content that would no longer exist at build time.
 
 **Fetching at build time** gets the studio everything it actually wants and costs
-none of that. `lib/content.ts` stops importing six JSON files and fetches one API
-response during `next build`. Nothing above that file changes — not a component,
-not a page, not a stylesheet. The export is still static, the HTML still arrives
-complete, every budget in §7 still holds and is still enforceable as written.
+none of that. The export is still static, the HTML still arrives complete, every
+budget in §7 still holds and is still enforceable as written.
+
+> **As built:** the fetch is `scripts/fetch-content.mjs`, running as `prebuild`,
+> which writes `src/content/bundle.generated.json`. `lib/content.ts` then imports
+> that one file where it used to import six. Doing it in a script rather than
+> with a top-level `await` inside `lib/content.ts` keeps every accessor below it
+> synchronous — so no page, component or stylesheet changed at all — and turns a
+> failed fetch into a plain message from a build step instead of an unhandled
+> rejection inside a server component.
 
 The only thing given up is immediacy: content goes live sixty to ninety seconds
 after Publish rather than instantly. The current git flow already has exactly that
@@ -49,8 +64,8 @@ weeks and not every few seconds.
 > **Decided: build-time fetch.** Publish writes a revision and calls a Cloudflare
 > deploy hook. The site rebuilds and redeploys itself.
 
-The studio still gets instant feedback, just not from production: the admin's own
-preview renders from the live draft tables, where no performance budget applies.
+The studio still gets feedback on unpublished work from the preview, which reads
+the draft directly — see §7.
 
 ---
 
@@ -68,10 +83,11 @@ preview renders from the live draft tables, where no performance budget applies.
                                                     ▼
 ┌─ CAFA-Template ─────────────────────────── Workers Build ─────────┐
 │                                                                   │
-│   next build                                                      │
-│     lib/content.ts  ──fetch──>  /api/content/published            │
-│     content-schema.ts           parses it, fails the build if bad │
-│     next export     ──>  out/   HTML + CSS + JS, no media         │
+│   prebuild   fetch-content.mjs ──> /api/content/published         │
+│                                └─> content/bundle.generated.json  │
+│   next build lib/content.ts       imports it                      │
+│              content-schema.ts    parses it, fails the build if bad│
+│   next export ──> out/            HTML + CSS + JS, no media       │
 │                                                                   │
 └───────────────────────────────────────────────────┬───────────────┘
                                                     ▼
@@ -262,6 +278,14 @@ worth being deliberate about:
   type has a field for it. The admin may edit values and must not add or remove
   keys; new keys arrive by migration alongside the code that reads them.
 
+> **As built:** the copy table also carries the chrome the site record used to
+> hold — `nav.works`, `nav.about` and so on, plus `localeName`. The nav's
+> *shape* is code, because the order and the route each item points at are wired
+> to the template's `lib/routes.ts`; its *labels* are words on a screen, and the
+> studio should be able to rename an item without a deploy. `worker/bundle.ts`
+> lifts them back out into `site` when it builds a revision, so the template's
+> `Dictionary` type never learns they exist.
+
 ---
 
 ## 5. Publishing, and what replaces the commit
@@ -365,7 +389,8 @@ it already takes an entry with intrinsic dimensions and a variant list.
 | Route | Auth | Purpose |
 |---|---|---|
 | `GET /api/content` | session | Live draft tables, for the admin |
-| `GET /api/content/published` | **public**, cached | Latest revision blob, for the build |
+| `GET /api/content/published` | **public** | Latest revision blob, for the production build |
+| `GET /api/content/draft` | preview token | The draft, for the preview build |
 | `POST /api/save` | session | Write draft tables in one `batch()` |
 | `POST /api/publish` | session | Snapshot → revision → POST deploy hook |
 | `POST /api/media` | session | Upload to R2, record dimensions |
@@ -375,9 +400,26 @@ it already takes an entry with intrinsic dimensions and a variant list.
 **Why the published endpoint is public.** Workers Builds has no session cookie,
 and published content is by definition already on the public website — the
 revision row only exists because someone pressed Publish. There is nothing to
-leak, provided private works are stripped at snapshot time (§5). Keep it public,
-cache it hard, let the deploy hook be what busts the cache. A shared secret here
-would be ceremony, not security.
+leak, provided private works are stripped at snapshot time (§5). A shared secret
+here would be ceremony, not security.
+
+It is served `no-store` rather than cached. This is read a handful of times a
+month, always by a build that has just been told there is something new to read;
+a stale hit would publish the previous revision and look exactly like a lost
+save. Caching the one request that must not be stale is a poor trade.
+
+> **As built: the preview survived.** Retiring the draft branch would have taken
+> "View draft" with it, which is a capability the studio uses rather than an
+> artefact of the old model. `/api/content/draft` returns the same bundle built
+> from the live tables, gated on a `PREVIEW_TOKEN` header that only the preview
+> build holds. So there are two Workers Builds environments and two deploy
+> hooks: saving pokes the preview, publishing pokes production. The studio's day
+> is unchanged.
+>
+> The draft has no revision id to report, so it reports an FNV-1a fingerprint of
+> its own content instead, and `/api/status` computes the same one. "Is the
+> preview showing what I last saved" is then the same comparison as "is the live
+> site showing what I published".
 
 **D1 has no interactive transactions.** It has `batch()`, which runs an ordered
 statement list atomically. Every save must be expressed as one batch — for

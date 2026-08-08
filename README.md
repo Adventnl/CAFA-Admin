@@ -1,62 +1,96 @@
 # CAFA-Admin
 
-The editor for [CAFA-Template](https://github.com/Adventnl/CAFA-Template) — the
-c.a.f.a atelier site. It lets the studio add works, change text and replace
+The editor and the backend for [CAFA-Template](https://github.com/Adventnl/CAFA-Template) —
+the c.a.f.a atelier site. It lets the studio add works, change text and replace
 photographs without touching code, then preview the result and publish it.
 
 ## How it works
 
-The site is a static export with no backend, so there is nothing for an editor
-to write to at runtime. Instead **the repository is the database**:
+One Cloudflare Worker serves both halves: the React editor as static assets, and
+the API that owns the content. The content is in D1 and the photographs are in
+R2. The site itself is a static export with no server runtime, so nothing is
+read at request time — the content is fetched once, by the site's build.
 
 ```
-studio edits  →  commit to `draft`  →  Cloudflare builds the preview
-                                              ↓
-                                       studio approves
-                                              ↓
-                      `main` fast-forwards  →  Cloudflare builds production
+studio edits  →  saved to the live tables  →  preview build reads the draft
+                              ↓
+                        studio publishes
+                              ↓
+        snapshot into a revision  →  deploy hook  →  production build
 ```
 
-Everything the studio changes lands in `src/content/*.json` and
-`media-source/**` in the template repository. Git supplies version history and
-rollback for free, and there is no database to back up, pay for or lose.
+Saving writes the tables. Publishing copies them into an append-only `revision`
+row and pokes a Cloudflare deploy hook; the production build reads the newest
+revision. So there are two states, as there always were, and they are no longer
+branches:
 
-Two branches carry the whole model:
-
-| Branch | What it is | Where it shows up |
+| | What it is | Where it shows up |
 |---|---|---|
-| `draft` | Where every save goes, immediately | The preview URL |
-| `main` | What the public sees | cafa.hanoryx.com |
+| The live tables | Where every save goes, immediately | The preview URL |
+| The newest revision | What the public sees | cafa.hanoryx.com |
 
-Publishing is a fast-forward of `main` to `draft`, never a merge — `draft` is
-only ever `main` plus content commits. If a developer pushes code to `main`,
-the admin notices that `draft` is behind and offers **Catch up with the site**,
-which merges `main` into `draft` before anything else happens.
+Rolling back inserts a new revision holding an old one's content, so history is
+append-only and anything that was ever live stays recoverable.
 
 ## What it will not let you do
 
-The admin is deliberately narrower than a general CMS. It refuses to write
-anything but `src/content/*.json` and `media-source/**`, and the constraints
-the site's own constitution sets are enforced in the form rather than
-discovered at build time:
+The admin is deliberately narrower than a general CMS. Most of the constraints
+the site's constitution sets are enforced in the form, and now also in the
+schema, rather than discovered at build time:
 
 - **Both languages, always.** Every piece of copy has a Chinese and an English
-  field side by side. A blank in either blocks the save.
-- **Alt text is required.** An image with no description cannot be saved. A
-  photograph that genuinely carries no information is marked *decorative*,
-  which is a deliberate choice rather than an omission.
-- **Photographs are resized before upload.** The site's pipeline never emits
-  anything above 2400px, so originals are scaled to fit that in the browser and
+  column side by side, both `NOT NULL`. A blank in either blocks the save.
+- **Alt text is required.** A `CHECK` constraint refuses an image whose
+  description is half-filled. A photograph that genuinely carries no information
+  is marked *decorative*, which is a deliberate choice rather than an omission.
+- **Photographs are resized before upload.** The site never asks for anything
+  above 2400px, so originals are scaled to fit that in the browser and
   re-encoded — which also drops the EXIF block and the GPS coordinates in it.
-- **Nav, locales and the site URL are not editable.** They are wired to
-  `lib/routes.ts` and to the deployment; changing one is a code change.
+  Their dimensions are then measured again in the Worker, from the bytes,
+  because they become the aspect box the site's CLS budget rests on.
+- **A private work publishes nothing.** It is listed in the index and has no
+  page; its cover and photographs are dropped when a revision is built, so no
+  URL for them ever reaches a browser.
+- **The nav's shape, the locales and the site URL are not editable.** They are
+  wired to the template's `lib/routes.ts` and to the deployment. The nav's
+  *labels* are editable, because they are words on a screen.
 
-If a save would still produce content the site cannot build, the draft build
-fails and `main` is untouched. The live site cannot be broken from here.
+If a save would still produce content the site cannot build, the build fails and
+the previous deploy keeps serving. The live site cannot be broken from here.
 
 ## Setting it up
 
-### 1. A GitHub OAuth app
+### 1. The database and the bucket
+
+```sh
+npx wrangler d1 create cafa-content     # paste the id into wrangler.jsonc
+npx wrangler r2 bucket create cafa-media
+npx wrangler d1 migrations apply cafa-content --remote
+```
+
+Connect a custom domain to the bucket in its R2 settings, and set `MEDIA_BASE`
+in `wrangler.jsonc` to match. That is where the template points image
+transformations.
+
+### 2. The content
+
+One-shot, from the JSON and photographs still in the template repository:
+
+```sh
+node scripts/import.mjs ../CAFA-Template
+npx wrangler d1 execute cafa-content --remote --file import/seed.sql
+sh import/upload.sh
+```
+
+The importer emits rather than executes, so both artefacts can be read before
+they are run. Both are re-runnable: the seed clears the tables it fills, and an
+object put over an existing key replaces it.
+
+**Only after `upload.sh` has succeeded** is it safe to delete `media-source/`
+from the template repository — until then it is the only copy of the
+photographs outside git history, and the importer reads from it.
+
+### 3. A GitHub OAuth app
 
 Create one at **Settings → Developer settings → OAuth Apps**:
 
@@ -65,33 +99,39 @@ Create one at **Settings → Developer settings → OAuth Apps**:
 
 Only the account named in `OWNER_LOGIN` (currently `adventnl`) can sign in.
 Anyone else is refused after the OAuth round trip, before a session exists.
+GitHub is only the sign-in now, so the scope is `read:user` — the token it
+returns cannot read or write a repository.
 
-### 2. Secrets
+### 4. Secrets
 
 ```sh
 npx wrangler secret put GITHUB_CLIENT_ID
 npx wrangler secret put GITHUB_CLIENT_SECRET
-npx wrangler secret put SESSION_SECRET     # 32+ random bytes
+npx wrangler secret put SESSION_SECRET            # 32+ random bytes
+npx wrangler secret put DEPLOY_HOOK_URL           # rebuilds the live site
+npx wrangler secret put PREVIEW_DEPLOY_HOOK_URL   # rebuilds the preview
+npx wrangler secret put PREVIEW_TOKEN             # lets the preview read the draft
 ```
 
-`SESSION_SECRET` both signs and encrypts the session cookie, which is where the
-GitHub token lives. Rotating it signs everyone out, which is the intended way
-to revoke access in a hurry.
+`SESSION_SECRET` both signs and encrypts the session cookie. Rotating it signs
+everyone out, which is the intended way to revoke access in a hurry.
 
-### 3. Cloudflare, on the template repository
+The three deploy-related secrets are optional. Without `DEPLOY_HOOK_URL`,
+publishing still writes a revision and simply does not trigger a build; without
+the preview pair there is no preview.
 
-Two things need to be true in the template's Workers Builds settings:
+### 5. Cloudflare, on the template repository
 
-1. **The `draft` branch is built**, as a non-production build, and **preview
-   URLs are enabled**. That preview alias is what "View draft" opens.
-2. Once that alias exists, add it to `wrangler.jsonc` here as `PREVIEW_URL`.
-   Until it is set, the admin simply shows no preview link — everything else
-   works.
+Two Workers Builds environments, both building the template:
 
-The `draft` branch itself is created automatically the first time the admin
-loads.
+1. **Production** — env `CONTENT_API=https://<admin>/api/content/published`.
+   Create a deploy hook for it and store the URL as `DEPLOY_HOOK_URL` here.
+2. **Preview** — env `CONTENT_API=https://<admin>/api/content/draft` and
+   `PREVIEW_TOKEN` matching the secret above. Its deploy hook becomes
+   `PREVIEW_DEPLOY_HOOK_URL`, and its alias becomes `PREVIEW_URL` in
+   `wrangler.jsonc`. Until that is set the admin simply shows no preview link.
 
-### 4. Deploy
+### 6. Deploy
 
 ```sh
 npm install
@@ -107,35 +147,54 @@ npm run build      # typecheck, then build the SPA into dist/
 npm run lint
 ```
 
-Local development needs a `.dev.vars` file with the three secrets above. It is
+Local development needs a `.dev.vars` file with the secrets above. It is
 gitignored; do not commit it.
 
 ## Layout
 
 ```
+migrations/
+  0001_initial.sql   the schema, and the constraints that are really rules
+scripts/
+  import.mjs         the one-shot move from files to database
 worker/
-  index.ts     routes, and the allowlist of paths the admin may write
-  session.ts   AES-GCM sealed cookie — no session storage anywhere
-  github.ts    the Git Data API: blobs → tree → commit → ref, atomically
+  index.ts           routes; the one public endpoint and why it is public
+  db.ts              eleven tables ⇄ one ContentSet, written in one batch
+  bundle.ts          what a published revision contains, and what it withholds
+  media.ts           R2, and dimensions read from the file rather than trusted
+  session.ts         AES-GCM sealed cookie — no session storage anywhere
 src/
-  content/     the shape of the site's JSON, and the rules a save must satisfy
-  editors/     one per content type
-  ui/          the form vocabulary, and the publish bar
-  useEditor.ts what has changed, and how it gets sent
+  content/           the shape of the content, and the rules a save must satisfy
+  editors/           one per content type
+  ui/                the form vocabulary, and the publish bar
+  useEditor.ts       what has changed, and how it gets sent
 ```
 
-### Why one commit per save
+### Why the whole content set goes over at once
 
-Saves go through the Git Data API rather than the simpler contents endpoint,
-which would make one commit per file. That is not just untidy: a work's JSON
-and the photographs it references arriving in separate commits means a build in
-between that points at an image which is not there yet. Blobs, one tree, one
-commit, one ref update — the site sees all of an edit or none of it.
+It is 39 KB. Sending all of it is simpler than describing which parts moved and
+cheaper than getting that description wrong. The write is a single `db.batch()`,
+which D1 runs as one transaction — deletes ordered children-first and inserts
+parents-first, so no statement in the batch leaves a dangling reference and no
+build can catch a half-applied save.
+
+### Why photographs upload before the save, not with it
+
+They used to arrive in the same git commit as the record referencing them, which
+is what made an edit atomic. A database gets that guarantee from a foreign key
+instead, and a foreign key needs its target to exist — so the object goes to R2
+and the row goes to `media` the moment a photograph is chosen, and the save that
+names it comes after. A photograph uploaded and then abandoned is an orphan in
+the bucket, which costs nothing at this volume and is the deliberate trade.
 
 ### The copy of the content types
 
 `src/content/types.ts` mirrors the template's `src/lib/types.ts` rather than
 importing it, because the two repositories deploy separately and a shared
-package for six interfaces would cost more than it saves. The copy cannot drift
-dangerously: the template re-parses every field at build time, so a mismatch
-fails the draft build and never reaches the live site.
+package for six interfaces would cost more than it saves. It diverges in two
+places on purpose — `SiteContent` has no `nav`, `locales` or `localeNames`, and
+`Dictionary` has `nav` and `localeName` — both because the admin's types should
+describe what the admin can actually change. `worker/bundle.ts` reconciles the
+two when it builds a revision. The copy cannot drift dangerously: the template
+re-parses every field at build time, so a mismatch fails the build and never
+reaches the live site.

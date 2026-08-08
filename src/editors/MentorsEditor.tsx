@@ -85,7 +85,7 @@ export function MentorsEditor({ editor }: MentorsEditorProps) {
                   folder="mentors"
                   name={mentor.slug}
                   mediaUrl={editor.mediaUrl}
-                  onStage={editor.stageMedia}
+                  onUpload={editor.putMedia}
                 />
               ) : (
                 <p className="empty">Give this mentor a key first — it names the portrait file.</p>

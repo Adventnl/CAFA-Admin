@@ -1,11 +1,22 @@
 /**
- * The shape of CAFA-Template's content/*.json.
+ * The shape of the content the studio owns.
  *
- * This mirrors the template's `src/lib/types.ts`. It is a copy rather than an
- * import because the two repositories deploy separately, and a shared package
- * for six interfaces would cost more than it saves. The copy cannot drift
- * dangerously: the template parses every field again at build time, so a
- * mismatch here fails the draft build and never reaches the live site.
+ * This mirrors CAFA-Template's `src/lib/types.ts`, and deliberately diverges
+ * from it in two places — both of which are the same idea, that the admin's
+ * types should describe what the admin can actually change:
+ *
+ *  - **`SiteContent` has no `nav`, `locales` or `localeNames`.** Those are wired
+ *    to the template's lib/routes.ts and to the deployment. worker/bundle.ts
+ *    adds them when it builds a published revision, so the template still
+ *    receives the complete record it expects.
+ *  - **`Dictionary` has `nav` and `localeName`, which the template's does not.**
+ *    The *shape* of the nav is code; the *words* in it are copy, and the studio
+ *    should be able to rename an item without a deploy. They are stored as copy
+ *    rows and lifted back out into `site` by worker/bundle.ts.
+ *
+ * The copy cannot drift dangerously in either direction: the template re-parses
+ * every field at build time, so a mismatch fails the build and never reaches
+ * the live site.
  */
 
 export const LOCALES = ['zh', 'en'] as const;
@@ -15,10 +26,18 @@ export type Locale = (typeof LOCALES)[number];
 export type LocalisedText = Record<Locale, string>;
 
 export interface ImageRef {
-  /** Path relative to media-source, e.g. "works/edible-house/01.jpg". */
+  /** The R2 object key, e.g. "works/edible-house/01.jpg". */
   src: string;
   /** Required. The empty string is how a decorative image is declared. */
   alt: LocalisedText | '';
+}
+
+/** Measured from the file when it is uploaded, and never edited by hand. */
+export interface MediaInfo {
+  key: string;
+  width: number;
+  height: number;
+  bytes: number;
 }
 
 export type WorkStatus = 'completed' | 'in-progress' | 'private';
@@ -59,16 +78,9 @@ export interface Mentor {
   portrait: ImageRef;
 }
 
-export type NavEntry =
-  | { label: LocalisedText; route: string }
-  | { label: LocalisedText; opens: string };
-
 export interface SiteContent {
   name: LocalisedText;
   url: string;
-  locales: Locale[];
-  localeNames: Record<Locale, string>;
-  nav: NavEntry[];
   studio: ImageRef[];
   contact: {
     email: string;
@@ -76,6 +88,14 @@ export interface SiteContent {
     address: LocalisedText;
     hours: LocalisedText;
   };
+}
+
+/** The nav items, by key. The order and the destinations live in the Worker. */
+export interface NavCopy {
+  works: string;
+  programs: string;
+  about: string;
+  contact: string;
 }
 
 export interface Dictionary {
@@ -118,9 +138,13 @@ export interface Dictionary {
   };
   notFound: { title: string; body: string; home: string };
   footer: { note: string };
+  /** Chrome, lifted into `site` when a revision is published. */
+  nav: NavCopy;
+  /** What this language calls itself in the switch — "中文", "EN". */
+  localeName: string;
 }
 
-/** Everything the admin holds in memory, and the file each part came from. */
+/** Everything the admin holds in memory. */
 export interface ContentSet {
   site: SiteContent;
   works: Work[];
@@ -129,17 +153,6 @@ export interface ContentSet {
   zh: Dictionary;
   en: Dictionary;
 }
-
-export const CONTENT_PATHS: Record<keyof ContentSet, string> = {
-  site: 'src/content/site.json',
-  works: 'src/content/works.json',
-  programs: 'src/content/programs.json',
-  mentors: 'src/content/mentors.json',
-  zh: 'src/content/dictionaries/zh.json',
-  en: 'src/content/dictionaries/en.json',
-};
-
-export const MEDIA_ROOT = 'media-source';
 
 export function emptyLocalised(): LocalisedText {
   return { zh: '', en: '' };

@@ -283,7 +283,7 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
             folder={folder}
             name="cover"
             mediaUrl={editor.mediaUrl}
-            onStage={editor.stageMedia}
+            onUpload={editor.putMedia}
           />
 
           <Repeatable
@@ -322,7 +322,7 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
                       : (image.src.split('/').pop() ?? '').replace(/\.[^.]+$/, '')
                   }
                   mediaUrl={editor.mediaUrl}
-                  onStage={editor.stageMedia}
+                  onUpload={editor.putMedia}
                 />
               );
             }}
