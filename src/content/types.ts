@@ -78,9 +78,13 @@ export interface Mentor {
   portrait: ImageRef;
 }
 
+/**
+ * No `url`. The site's origin is deployment configuration rather than content —
+ * it comes from the PRODUCTION_URL var and is stamped into the published bundle
+ * by worker/bundle.ts, which is also where the reasoning lives.
+ */
 export interface SiteContent {
   name: LocalisedText;
-  url: string;
   studio: ImageRef[];
   contact: {
     email: string;

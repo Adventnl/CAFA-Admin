@@ -17,6 +17,16 @@
  * are copy, and the studio should be able to rename an item without a deploy.
  * They live in the copy table under `nav.*` and are lifted out into `site`
  * here, so the template's `Dictionary` type never has to know about them.
+ *
+ * `url` is the same kind of thing, and arrives the same way. It is the origin
+ * the site is deployed on — every canonical, hreflang, og:url and sitemap entry
+ * in the template is resolved against it — so it belongs to the deployment,
+ * not to the content. It used to be a column on the `site` table, which meant
+ * moving domains took a wrangler edit *and* a hand-written UPDATE against D1,
+ * with nothing to catch the second one being forgotten and a silently wrong
+ * canonical tag as the reward. It now comes from PRODUCTION_URL, which is the
+ * same value the admin already polls for build-info.json — one origin, named
+ * once. Migration 0002 dropped the column.
  */
 import { LOCALES, type ContentSet, type Dictionary, type Work } from '../src/content/types';
 import type { MediaRow } from './db';
@@ -100,6 +110,7 @@ export function buildBundle(
   content: ContentSet,
   media: MediaRow[],
   mediaBase: string,
+  siteUrl: string,
 ): PublishedBundle {
   const works = content.works.map(project);
 
@@ -126,6 +137,10 @@ export function buildBundle(
   return {
     site: {
       ...content.site,
+      // Trailing slash stripped for the same reason lib/media.ts strips one off
+      // mediaBase: everything downstream resolves against it, and `new URL()`
+      // against a base ending in a slash is not the same URL.
+      url: siteUrl.replace(/\/$/, ''),
       locales: [...LOCALES],
       localeNames: { zh: zhChrome.localeName, en: enChrome.localeName },
       nav: NAV.map((entry) => {

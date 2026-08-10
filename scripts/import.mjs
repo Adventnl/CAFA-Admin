@@ -188,8 +188,10 @@ say();
 
 say('-- site --------------------------------------------------------------');
 say(
-  `INSERT INTO site (id, name_zh, name_en, url, contact_email, contact_wechat, address_zh, address_en, hours_zh, hours_en)\n` +
-    `VALUES (1, ${q(site.name.zh)}, ${q(site.name.en)}, ${q(site.url)}, ${q(site.contact.email)}, ` +
+  // No url: the site's origin comes from the PRODUCTION_URL var now, not from
+  // a column. Migration 0002 has the reasoning.
+  `INSERT INTO site (id, name_zh, name_en, contact_email, contact_wechat, address_zh, address_en, hours_zh, hours_en)\n` +
+    `VALUES (1, ${q(site.name.zh)}, ${q(site.name.en)}, ${q(site.contact.email)}, ` +
     `${q(site.contact.wechat)}, ${q(site.contact.address.zh)}, ${q(site.contact.address.en)}, ` +
     `${q(site.contact.hours.zh)}, ${q(site.contact.hours.en)});`,
 );

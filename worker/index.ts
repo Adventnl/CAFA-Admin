@@ -39,6 +39,11 @@ interface Env {
   OWNER_LOGIN: string;
   /** Where the originals are served from, so the template can transform them. */
   MEDIA_BASE: string;
+  /**
+   * The public site's origin. Polled for build-info.json, and stamped into the
+   * published bundle as `site.url` — see worker/bundle.ts for why it lives here
+   * rather than in the database.
+   */
   PRODUCTION_URL: string;
   PREVIEW_URL?: string;
 
@@ -113,7 +118,7 @@ async function newestRevision(env: Env): Promise<Revision | null> {
 /** The draft, in exactly the form a published revision takes, so the two compare. */
 async function draftBundle(env: Env): Promise<string> {
   const [content, media] = await Promise.all([readContent(env.DB), readMedia(env.DB)]);
-  return JSON.stringify(buildBundle(content, media, env.MEDIA_BASE));
+  return JSON.stringify(buildBundle(content, media, env.MEDIA_BASE, env.PRODUCTION_URL));
 }
 
 /**

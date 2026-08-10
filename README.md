@@ -27,7 +27,7 @@ branches:
 | | What it is | Where it shows up |
 |---|---|---|
 | The live tables | Where every save goes, immediately | The preview URL |
-| The newest revision | What the public sees | cafa.hanoryx.com |
+| The newest revision | What the public sees | cafa-studio.com |
 
 Rolling back inserts a new revision holding an old one's content, so history is
 append-only and anything that was ever live stays recoverable.
@@ -52,8 +52,10 @@ schema, rather than discovered at build time:
   page; its cover and photographs are dropped when a revision is built, so no
   URL for them ever reaches a browser.
 - **The nav's shape, the locales and the site URL are not editable.** They are
-  wired to the template's `lib/routes.ts` and to the deployment. The nav's
-  *labels* are editable, because they are words on a screen.
+  wired to the template's `lib/routes.ts` and to the deployment — the site URL
+  literally so: it is the `PRODUCTION_URL` var, stamped into each published
+  revision by `worker/bundle.ts`. The nav's *labels* are editable, because they
+  are words on a screen.
 
 If a save would still produce content the site cannot build, the build fails and
 the previous deploy keeps serving. The live site cannot be broken from here.
@@ -68,9 +70,16 @@ npx wrangler r2 bucket create cafa-media
 npx wrangler d1 migrations apply cafa-content --remote
 ```
 
-Connect a custom domain to the bucket in its R2 settings, and set `MEDIA_BASE`
-in `wrangler.jsonc` to match. That is where the template points image
-transformations.
+Connect **`media.cafa-studio.com`** to the bucket in its R2 settings, so it
+matches `MEDIA_BASE` in `wrangler.jsonc`. That is where the template points
+image transformations, and it is a subdomain of the site's own zone on purpose
+— `/cdn-cgi/image/` runs on the zone serving the page, so an origin inside that
+same zone costs no second TLS handshake on the LCP path.
+
+Turn **Image Transformations** on for the `cafa-studio.com` zone while you are
+there (Images → Transformations). Without it every `/cdn-cgi/image/…` URL the
+template emits 404s, and since that is every photograph on the site, it is worth
+confirming on the first deploy rather than discovering later.
 
 ### 2. The content
 
@@ -94,8 +103,15 @@ photographs outside git history, and the importer reads from it.
 
 Create one at **Settings → Developer settings → OAuth Apps**:
 
-- **Homepage URL** — the deployed admin's URL
-- **Authorization callback URL** — that URL plus `/auth/callback`
+- **Homepage URL** — `https://admin.cafa-studio.com`
+- **Authorization callback URL** — `https://admin.cafa-studio.com/auth/callback`
+
+The callback is the one that has to be exact. `handleLogin` builds the redirect
+from the request's own origin, so the Worker always sends whatever host you
+reached it on — but GitHub checks that against what is registered here and
+refuses anything else. **Moving the admin to a different hostname means editing
+this app**, or sign-in fails at the callback with a mismatch error rather than
+anywhere useful.
 
 Only the account named in `OWNER_LOGIN` (currently `adventnl`) can sign in.
 Anyone else is refused after the OAuth round trip, before a session exists.
@@ -124,12 +140,22 @@ the preview pair there is no preview.
 
 Two Workers Builds environments, both building the template:
 
-1. **Production** — env `CONTENT_API=https://<admin>/api/content/published`.
-   Create a deploy hook for it and store the URL as `DEPLOY_HOOK_URL` here.
-2. **Preview** — env `CONTENT_API=https://<admin>/api/content/draft` and
-   `PREVIEW_TOKEN` matching the secret above. Its deploy hook becomes
+1. **Production** — env
+   `CONTENT_API=https://admin.cafa-studio.com/api/content/published`. Create a
+   deploy hook for it and store the URL as `DEPLOY_HOOK_URL` here. Its
+   `wrangler.jsonc` binds the apex, `cafa-studio.com`.
+2. **Preview** — env `CONTENT_API=https://admin.cafa-studio.com/api/content/draft`
+   and `PREVIEW_TOKEN` matching the secret above. Its deploy hook becomes
    `PREVIEW_DEPLOY_HOOK_URL`, and its alias becomes `PREVIEW_URL` in
    `wrangler.jsonc`. Until that is set the admin simply shows no preview link.
+   The preview never answers on the custom domain — only the production
+   deployment does — so it keeps its own alias URL and the apex keeps serving
+   whatever was last published.
+
+Add a redirect rule on the zone sending `www.cafa-studio.com` to the apex,
+301. The Worker deliberately answers on the apex alone: two hostnames serving
+identical pages is a duplicate-content problem for canonical tags to clean up
+after, and a redirect is the cheaper answer.
 
 ### 6. Deploy
 

@@ -1,0 +1,23 @@
+-- The site's origin stops being content.
+--
+-- `site.url` was carried over from the era when the content lived in JSON files
+-- in the template repository, where it was as good a place as any to keep it.
+-- Behind a database it is actively wrong: it is the origin the site is deployed
+-- on, it is not editable in the admin (SiteEditor has always said so), and it
+-- duplicated the PRODUCTION_URL var — the same string, in two places, with
+-- nothing keeping them equal.
+--
+-- The cost of that duplication is only visible when the domain moves, which is
+-- exactly when nobody is looking for it: change PRODUCTION_URL, forget the
+-- UPDATE, and every canonical, hreflang, og:url and sitemap entry keeps naming
+-- the old host. Nothing errors. The build succeeds. The site is just quietly
+-- wrong for search engines.
+--
+-- worker/bundle.ts now stamps PRODUCTION_URL into the published bundle as
+-- `site.url`, so the template is unchanged — it still reads `site.url` from the
+-- bundle and still parses it at the same gate. The column has no readers left.
+--
+-- Apply this *before* deploying the Worker that goes with it: between the two,
+-- a save would try to insert nine values into an eight-column table. It is a
+-- one-person admin and the window is a few seconds, but the order is free.
+ALTER TABLE site DROP COLUMN url;

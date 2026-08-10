@@ -32,7 +32,6 @@ import type {
 interface SiteRow {
   name_zh: string;
   name_en: string;
-  url: string;
   contact_email: string;
   contact_wechat: string;
   address_zh: string;
@@ -277,7 +276,6 @@ export async function readContent(db: D1Database): Promise<ContentSet> {
 
   const parsedSite: SiteContent = {
     name: pair(site.name_zh, site.name_en),
-    url: site.url,
     studio: studio.results.map((row) =>
       imageRef(row.media_key, row.alt_zh, row.alt_en, row.decorative),
     ),
@@ -346,14 +344,13 @@ export async function writeContent(db: D1Database, content: ContentSet): Promise
   statements.push(
     db
       .prepare(
-        `INSERT INTO site (id, name_zh, name_en, url, contact_email, contact_wechat,
+        `INSERT INTO site (id, name_zh, name_en, contact_email, contact_wechat,
                            address_zh, address_en, hours_zh, hours_en)
-         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         content.site.name.zh,
         content.site.name.en,
-        content.site.url,
         content.site.contact.email,
         content.site.contact.wechat,
         content.site.contact.address.zh,
