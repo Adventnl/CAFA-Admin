@@ -1,13 +1,15 @@
 /**
  * Sessions, with nothing to store.
  *
- * The cookie carries the GitHub token itself, sealed with AES-GCM under a key
- * derived from SESSION_SECRET. GCM is authenticated, so a tampered cookie fails
- * to open rather than opening into something attacker-shaped — which means there
- * is no session table to provision, expire or leak.
+ * The cookie carries who signed in, sealed with AES-GCM under a key derived
+ * from SESSION_SECRET. GCM is authenticated, so a tampered cookie fails to open
+ * rather than opening into something attacker-shaped — which means there is no
+ * session table to provision, expire or leak.
  *
- * The token never reaches the browser in readable form and never leaves the
- * Worker in any form.
+ * It used to carry a GitHub token with `repo` scope, because the repository was
+ * the database. It no longer does: the content is in D1, GitHub is only the
+ * sign-in, and the OAuth scope is down to `read:user`. A stolen cookie is now
+ * worth a session and nothing else.
  */
 
 const COOKIE = 'cafa_session';
@@ -18,7 +20,6 @@ type Purpose = 'session' | 'oauth-state';
 
 export interface Session {
   login: string;
-  token: string;
 }
 
 interface Sealed<T> {
@@ -164,7 +165,7 @@ export async function sealSession(secret: string, session: Session): Promise<str
 export async function readSession(request: Request, secret: string): Promise<Session | null> {
   const value = await open<Session>(secret, 'session', read(request, COOKIE));
   if (value === null) return null;
-  if (typeof value.login !== 'string' || typeof value.token !== 'string') return null;
+  if (typeof value.login !== 'string') return null;
   return value;
 }
 

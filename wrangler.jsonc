@@ -1,7 +1,7 @@
 {
   // One Worker serves both halves of the admin: the built SPA as static assets,
-  // and the /api and /auth routes that hold the GitHub token. The token never
-  // reaches the browser, which is the whole reason there is a server here at all.
+  // and the /api and /auth routes that hold the session and the only writable
+  // handle on the content.
   "name": "cafa-admin",
   "main": "worker/index.ts",
   "compatibility_date": "2026-08-05",
@@ -15,28 +15,56 @@
     "not_found_handling": "single-page-application"
   },
 
+  // The content. Create it once with:
+  //   npx wrangler d1 create cafa-content
+  // then paste the id it prints in here, and apply the schema with:
+  //   npx wrangler d1 migrations apply cafa-content --remote
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cafa-content",
+      "database_id": "REPLACE_WITH_THE_ID_WRANGLER_PRINTS",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // The photographs. Create it once with:
+  //   npx wrangler r2 bucket create cafa-media
+  // then connect a custom domain to it in the bucket's settings, so the
+  // template can point image transformations at a stable origin.
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "cafa-media"
+    }
+  ],
+
   "vars": {
     // The only GitHub account allowed to sign in. Everyone else is refused
     // after the OAuth round trip, before a session is ever issued.
     "OWNER_LOGIN": "adventnl",
 
-    // The repository this admin edits.
-    "REPO_OWNER": "Adventnl",
-    "REPO_NAME": "CAFA-Template",
-
-    // Where edits land, and where publishing sends them.
-    "DRAFT_BRANCH": "draft",
-    "PRODUCTION_BRANCH": "main",
+    // Where the R2 originals are served from. The template appends the object
+    // key to this and asks Cloudflare to transform the result, so it is the one
+    // place that decides where photographs come from.
+    "MEDIA_BASE": "https://media.cafa.hanoryx.com",
 
     // Polled for build-info.json to answer "is what I published actually live".
     "PRODUCTION_URL": "https://cafa.hanoryx.com"
 
-    // PREVIEW_URL is set once Cloudflare has built the draft branch once and
-    // its alias exists. Without it the admin simply shows no preview link.
+    // PREVIEW_URL is set once the preview Worker has built once and its alias
+    // exists. Without it the admin simply shows no preview link.
   }
 
   // Secrets, set with `wrangler secret put <name>`:
-  //   GITHUB_CLIENT_ID      — the OAuth app's client id
-  //   GITHUB_CLIENT_SECRET  — the OAuth app's client secret
-  //   SESSION_SECRET        — 32+ random bytes; signs and encrypts the cookie
+  //   GITHUB_CLIENT_ID         — the OAuth app's client id
+  //   GITHUB_CLIENT_SECRET     — the OAuth app's client secret
+  //   SESSION_SECRET           — 32+ random bytes; signs and encrypts the cookie
+  //   DEPLOY_HOOK_URL          — poked on publish; rebuilds the live site
+  //   PREVIEW_DEPLOY_HOOK_URL  — poked on save; rebuilds the preview
+  //   PREVIEW_TOKEN            — lets the preview build read unpublished work
+  //
+  // The three deploy-related secrets are all optional. Without DEPLOY_HOOK_URL
+  // publishing still writes a revision, it just does not trigger the build;
+  // without the preview pair there is simply no preview.
 }

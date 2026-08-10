@@ -93,7 +93,7 @@ export function SiteEditor({ editor }: SiteEditorProps) {
                   : (image.src.split('/').pop() ?? '').replace(/\.[^.]+$/, '')
               }
               mediaUrl={editor.mediaUrl}
-              onStage={editor.stageMedia}
+              onUpload={editor.putMedia}
             />
           );
         }}

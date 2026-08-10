@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 
 import { loadContent, whoami } from './api';
-import type { ContentSet } from './content/types';
+import type { ContentSet, MediaInfo } from './content/types';
 import { CopyEditor } from './editors/CopyEditor';
 import { MentorsEditor } from './editors/MentorsEditor';
 import { ProgramsEditor } from './editors/ProgramsEditor';
@@ -26,7 +26,7 @@ type SectionId = (typeof SECTIONS)[number]['id'];
 export function App() {
   const [login, setLogin] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
-  const [loaded, setLoaded] = useState<{ head: string; content: ContentSet } | null>(null);
+  const [loaded, setLoaded] = useState<{ content: ContentSet; media: MediaInfo[] } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
   const signInError = new URLSearchParams(window.location.search).get('error');
@@ -63,17 +63,17 @@ export function App() {
   if (failure !== null) return <p className="centred problem">{failure}</p>;
   if (loaded === null) return <p className="centred">Loading the site…</p>;
 
-  return <Editing login={login} head={loaded.head} content={loaded.content} />;
+  return <Editing login={login} content={loaded.content} media={loaded.media} />;
 }
 
 interface EditingProps {
   login: string;
-  head: string;
   content: ContentSet;
+  media: MediaInfo[];
 }
 
-function Editing({ login, head, content }: EditingProps) {
-  const editor = useEditor(content, head);
+function Editing({ login, content, media }: EditingProps) {
+  const editor = useEditor(content, media);
   const [section, setSection] = useState<SectionId>('works');
 
   // The browser's own guard is the only one that catches a closed tab.
