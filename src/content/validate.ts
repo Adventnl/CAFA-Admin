@@ -172,7 +172,6 @@ export function checkContent(content: ContentSet): Problem[] {
 
   const site = new Collector('site', 'site');
   site.localised(content.site.name, 'Studio name');
-  site.text(content.site.url, 'Site address');
   site.text(content.site.contact.email, 'Email');
   site.text(content.site.contact.wechat, 'WeChat');
   site.localised(content.site.contact.address, 'Address');

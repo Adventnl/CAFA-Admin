@@ -7,6 +7,16 @@
   "compatibility_date": "2026-08-05",
   "compatibility_flags": ["nodejs_compat"],
 
+  // The editor's own hostname. A custom domain rather than a route, so
+  // Cloudflare owns the DNS record and the certificate and there is no
+  // fall-through to an origin — the Worker is the origin.
+  //
+  // Changing this means changing the GitHub OAuth app's callback URL to match:
+  // handleLogin derives the redirect from the request's own origin, so the two
+  // agree by construction, but GitHub still checks it against what is
+  // registered. See README §3.
+  "routes": [{ "pattern": "admin.cafa-studio.com", "custom_domain": true }],
+
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
@@ -47,10 +57,23 @@
     // Where the R2 originals are served from. The template appends the object
     // key to this and asks Cloudflare to transform the result, so it is the one
     // place that decides where photographs come from.
-    "MEDIA_BASE": "https://media.cafa.hanoryx.com",
+    //
+    // A subdomain of the site's own zone on purpose: /cdn-cgi/image/ runs on
+    // the zone the *page* is served from, and keeping the origin inside that
+    // same zone means no second TLS handshake on the LCP path.
+    "MEDIA_BASE": "https://media.cafa-studio.com",
 
-    // Polled for build-info.json to answer "is what I published actually live".
-    "PRODUCTION_URL": "https://cafa.hanoryx.com"
+    // The public site's origin, and now the only place that says where it is.
+    //
+    // Two things read it. The admin polls it for build-info.json, to answer "is
+    // what I published actually live". And worker/bundle.ts stamps it into the
+    // published bundle as `site.url`, which is what the template builds every
+    // canonical, hreflang, og:url and sitemap entry from — so a domain move is
+    // this line plus a redeploy, not a database edit nobody remembers to make.
+    //
+    // No trailing slash: it is used as a URL base, and a trailing slash would
+    // survive into every absolute URL derived from it.
+    "PRODUCTION_URL": "https://cafa-studio.com"
 
     // PREVIEW_URL is set once the preview Worker has built once and its alias
     // exists. Without it the admin simply shows no preview link.

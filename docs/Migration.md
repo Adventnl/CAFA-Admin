@@ -91,8 +91,9 @@ the draft directly — see §7.
 │                                                                   │
 └───────────────────────────────────────────────────┬───────────────┘
                                                     ▼
-                              cafa.hanoryx.com  (static assets Worker)
+                               cafa-studio.com  (static assets Worker)
                               images via /cdn-cgi/image/ from R2
+                                    (media.cafa-studio.com)
 ```
 
 Three properties worth naming, because they are what makes this safe:
@@ -162,7 +163,7 @@ are not editable and adding one is a code change.
 CREATE TABLE site (
   id             INTEGER PRIMARY KEY CHECK (id = 1),
   name_zh        TEXT NOT NULL,  name_en        TEXT NOT NULL,
-  url            TEXT NOT NULL,
+  url            TEXT NOT NULL,  -- retired by migration 0002; see below
   contact_email  TEXT NOT NULL,  contact_wechat TEXT NOT NULL,
   address_zh     TEXT NOT NULL,  address_en     TEXT NOT NULL,
   hours_zh       TEXT NOT NULL,  hours_en       TEXT NOT NULL
@@ -253,6 +254,21 @@ CREATE TABLE site_studio (
   CHECK (decorative = 1 OR (alt_zh <> '' AND alt_en <> ''))
 );
 ```
+
+> **Since built: `site.url` was the wrong kind of thing.** It came across from
+> the JSON files unexamined, where it had been as good a place as any. Behind a
+> database it was a duplicate of the `PRODUCTION_URL` var with nothing keeping
+> the two equal — and the failure it invited only appears when the domain moves,
+> which is the moment nobody is auditing canonical tags. Change the var, forget
+> the `UPDATE`, and every canonical, hreflang, `og:url` and sitemap entry keeps
+> naming the old host while the build stays green.
+>
+> `worker/bundle.ts` now stamps `PRODUCTION_URL` into each revision as
+> `site.url`, so the template is untouched — it reads the same field from the
+> same bundle through the same parse gate. Migration 0002 dropped the column.
+> The general shape is worth keeping in mind for anything else that lands in
+> this table: **the site's content belongs in D1, the site's deployment does
+> not.**
 
 ### The dictionaries
 
@@ -376,11 +392,12 @@ it already takes an entry with intrinsic dimensions and a variant list.
    works before cutover.
 2. `fit=scale-down` must be used so a 900 px original is never upscaled to 1200 —
    matching what `targetWidths()` does today.
-3. Confirm `/cdn-cgi/image/` on the `cafa.hanoryx.com` zone passes through ahead
+3. Confirm `/cdn-cgi/image/` on the `cafa-studio.com` zone passes through ahead
    of the static-assets Worker. It should — `/cdn-cgi/*` is handled before Workers
    — and keeping images on the primary hostname avoids a second connection on the
-   LCP path. If it does not, the fallback is `media.cafa.hanoryx.com` bound to the
-   bucket, plus a `<link rel="preconnect">` to protect LCP.
+   LCP path. The origin they are fetched *from* is `media.cafa-studio.com`, the
+   R2 custom domain, which is inside the same zone for the same reason.
+   Transformations must be enabled on the zone or every one of these 404s.
 
 ---
 
