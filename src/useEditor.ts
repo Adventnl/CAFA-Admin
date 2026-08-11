@@ -13,7 +13,9 @@
  */
 import { useCallback, useMemo, useRef, useState } from 'react';
 
-import { ApiError, saveContent, uploadMedia } from './api';
+import { contentService } from './services/content';
+import { ApiError } from './services/http';
+import { mediaService } from './services/media';
 import { checkContent, type Problem } from './content/validate';
 import type { ContentSet, MediaInfo } from './content/types';
 import { prepareImage } from './images';
@@ -55,7 +57,7 @@ export function useEditor(initial: ContentSet, initialMedia: MediaInfo[]): Edito
     setUploading(true);
     setError(null);
     try {
-      await uploadMedia(key, await prepareImage(file));
+      await mediaService.upload(key, await prepareImage(file));
       known.current.add(key);
       setVersion((current) => current + 1);
     } finally {
@@ -63,10 +65,7 @@ export function useEditor(initial: ContentSet, initialMedia: MediaInfo[]): Edito
     }
   }, []);
 
-  const mediaUrl = useCallback(
-    (key: string) => `/api/media?key=${encodeURIComponent(key)}&v=${version}`,
-    [version],
-  );
+  const mediaUrl = useCallback((key: string) => mediaService.url(key, version), [version]);
 
   const problems = useMemo(() => checkContent(content), [content]);
 
@@ -76,7 +75,7 @@ export function useEditor(initial: ContentSet, initialMedia: MediaInfo[]): Edito
     setError(null);
 
     try {
-      await saveContent(content);
+      await contentService.save(content);
       setDirty(false);
       return true;
     } catch (failure) {

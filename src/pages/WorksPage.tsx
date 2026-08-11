@@ -3,7 +3,7 @@
  *
  * The list's order is the site's order. That is an editorial decision rather
  * than anything derived from year or number, which is why it is moved by hand
- * here and stored as the array's order in works.json.
+ * here and stored as the `position` column on the works table.
  */
 import { useState } from 'react';
 
@@ -55,11 +55,11 @@ function blankWork(existing: readonly Work[]): Work {
   };
 }
 
-interface WorksEditorProps {
+interface WorksPageProps {
   editor: Editor;
 }
 
-export function WorksEditor({ editor }: WorksEditorProps) {
+export function WorksPage({ editor }: WorksPageProps) {
   const works = editor.content.works;
   const [openAt, setOpenAt] = useState<number | null>(null);
 

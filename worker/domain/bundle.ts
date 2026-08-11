@@ -28,8 +28,8 @@
  * same value the admin already polls for build-info.json — one origin, named
  * once. Migration 0002 dropped the column.
  */
-import { LOCALES, type ContentSet, type Dictionary, type Work } from '../src/content/types';
-import type { MediaRow } from './db';
+import { LOCALES, type ContentSet, type Dictionary, type Work } from '../../src/content/types';
+import type { MediaRow } from '../models/rows';
 
 /**
  * The nav, as structure. Each entry names a route or a panel in the template's

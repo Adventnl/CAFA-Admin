@@ -15,11 +15,11 @@ function blankProgram(): Program {
   };
 }
 
-interface ProgramsEditorProps {
+interface ProgramsPageProps {
   editor: Editor;
 }
 
-export function ProgramsEditor({ editor }: ProgramsEditorProps) {
+export function ProgramsPage({ editor }: ProgramsPageProps) {
   const programs = editor.content.programs;
 
   const write = (at: number, program: Program) =>

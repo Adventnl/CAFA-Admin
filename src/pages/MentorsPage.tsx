@@ -18,11 +18,11 @@ function blankMentor(): Mentor {
   };
 }
 
-interface MentorsEditorProps {
+interface MentorsPageProps {
   editor: Editor;
 }
 
-export function MentorsEditor({ editor }: MentorsEditorProps) {
+export function MentorsPage({ editor }: MentorsPageProps) {
   const mentors = editor.content.mentors;
 
   const write = (at: number, mentor: Mentor) =>

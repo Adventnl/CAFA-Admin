@@ -54,7 +54,7 @@ schema, rather than discovered at build time:
 - **The nav's shape, the locales and the site URL are not editable.** They are
   wired to the template's `lib/routes.ts` and to the deployment — the site URL
   literally so: it is the `PRODUCTION_URL` var, stamped into each published
-  revision by `worker/bundle.ts`. The nav's *labels* are editable, because they
+  revision by `worker/domain/bundle.ts`. The nav's *labels* are editable, because they
   are words on a screen.
 
 If a save would still produce content the site cannot build, the build fails and
@@ -240,23 +240,74 @@ gitignored; do not commit it.
 
 ## Layout
 
+The Worker is layered the way `veyra_api` is, because the same shape solves the
+same problem: **dependencies point down only, and each layer is allowed to know
+exactly one thing.** A controller knows HTTP and no SQL. A service knows the
+rules and never builds a `Response`. A repository knows rows and has never heard
+of a `Request`.
+
 ```
 migrations/
-  0001_initial.sql   the schema, and the constraints that are really rules
+  0001_initial.sql          the schema, and the constraints that are really rules
 scripts/
-  import.mjs         the one-shot move from files to database
+  import.mjs                the one-shot move from files to database
+
 worker/
-  index.ts           routes; the one public endpoint and why it is public
-  db.ts              eleven tables ⇄ one ContentSet, written in one batch
-  bundle.ts          what a published revision contains, and what it withholds
-  media.ts           R2, and dimensions read from the file rather than trusted
-  session.ts         AES-GCM sealed cookie — no session storage anywhere
+  index.ts                  the composition root: build, declare routes, dispatch
+  env.ts                    every binding and secret, in one interface
+
+  shared/                   what veyra_api keeps in its Shared project
+    api-response.ts         the { success, data, code, msg } envelope
+    api-exception.ts        the one exception a service throws on purpose
+    exception-filter.ts     where every throw becomes a response
+    router.ts               the route table; [Authorize] and [AllowAnonymous]
+    current-user.ts         who is asking
+
+  controllers/              HTTP in, HTTP out — one per resource
+    auth · session · content · media · publish · revisions · public-content
+
+  services/                 the rules
+    auth · content · media · publish · deploy
+
+  repositories/             D1: rows in, domain objects out
+    content.repository.ts   the unit of work — one batch, one transaction
+    site · works · programs · mentors · copy    one aggregate each
+    media · revision
+    mapping.ts              paired columns ⇄ LocalisedText, four columns ⇄ ImageRef
+
+  storage/media-storage.ts  R2
+  models/rows.ts            the tables, as TypeScript sees them
+  models/dtos/              request and response contracts
+  domain/
+    bundle.ts               what a published revision contains, and what it withholds
+    image.ts                dimensions read from the file rather than trusted
+    session.ts              AES-GCM sealed cookie — no session storage anywhere
+
 src/
-  content/           the shape of the content, and the rules a save must satisfy
-  editors/           one per content type
-  ui/                the form vocabulary, and the publish bar
-  useEditor.ts       what has changed, and how it gets sent
+  content/                  the shape of the content, and the rules a save must satisfy
+  services/                 the only place the browser talks to the Worker
+    http.ts                 unwraps the envelope; nothing else knows about fetch
+    session · content · media · publish
+  pages/                    one per route, plus sign-in and history
+  ui/                       the layout, the form vocabulary, the publish bar
+  routes.ts                 the route table, and the whole of the client router
+  useEditor.ts              what has changed, and how it gets sent
 ```
+
+### Why the envelope stops at the build endpoints
+
+Every authenticated route answers in `ApiResponse<T>`. The two that a *build*
+reads — `/api/content/published` and `/api/content/draft` — deliberately do not:
+they answer a bare `{ revision, bundle }`, because that is a contract with a
+different repository. CAFA-Template's `scripts/fetch-content.mjs` checks for
+exactly that shape before `next build` starts. The envelope exists for a client
+that branches on `success` and shows `msg` to a person; a build script that
+exits non-zero is not that client, and wrapping those two would buy consistency
+nobody reads at the cost of a lockstep deploy across two repositories.
+
+Their *failures* still come back enveloped, because those go through the same
+exception filter as everything else — and the build script exits on the status
+code before it ever looks at the body.
 
 ### Why the whole content set goes over at once
 
@@ -282,7 +333,7 @@ importing it, because the two repositories deploy separately and a shared
 package for six interfaces would cost more than it saves. It diverges in two
 places on purpose — `SiteContent` has no `nav`, `locales` or `localeNames`, and
 `Dictionary` has `nav` and `localeName` — both because the admin's types should
-describe what the admin can actually change. `worker/bundle.ts` reconciles the
+describe what the admin can actually change. `worker/domain/bundle.ts` reconciles the
 two when it builds a revision. The copy cannot drift dangerously: the template
 re-parses every field at build time, so a mismatch fails the build and never
 reaches the live site.

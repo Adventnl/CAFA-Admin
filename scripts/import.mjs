@@ -283,7 +283,7 @@ flatten(en, [], enFlat);
 /*
  * The chrome copy, which site.json carried and the dictionaries did not.
  *
- * The nav's shape is code — worker/bundle.ts owns the order and what each item
+ * The nav's shape is code — worker/domain/bundle.ts owns the order and what each item
  * points at — but its labels are words on a screen, so they become copy the
  * studio can edit. The key is the route or panel name, which is what bundle.ts
  * looks them up by. `localeName` is what a language calls itself in the switch.

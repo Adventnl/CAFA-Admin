@@ -42,7 +42,7 @@ export async function prepareImage(file: File): Promise<Blob> {
 /**
  * Photographs are filed under a work, a mentor or the studio, and the content
  * record stores exactly the key the bucket uses — so both are derived here and
- * there is no prefix to get wrong. worker/media.ts holds the allowlist that
+ * there is no prefix to get wrong. worker/domain/image.ts holds the allowlist that
  * refuses anything this would not have produced.
  */
 export function mediaKey(folder: string, name: string): string {

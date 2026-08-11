@@ -263,7 +263,7 @@ CREATE TABLE site_studio (
 > the `UPDATE`, and every canonical, hreflang, `og:url` and sitemap entry keeps
 > naming the old host while the build stays green.
 >
-> `worker/bundle.ts` now stamps `PRODUCTION_URL` into each revision as
+> `worker/domain/bundle.ts` now stamps `PRODUCTION_URL` into each revision as
 > `site.url`, so the template is untouched — it reads the same field from the
 > same bundle through the same parse gate. Migration 0002 dropped the column.
 > The general shape is worth keeping in mind for anything else that lands in
@@ -298,7 +298,7 @@ worth being deliberate about:
 > hold — `nav.works`, `nav.about` and so on, plus `localeName`. The nav's
 > *shape* is code, because the order and the route each item points at are wired
 > to the template's `lib/routes.ts`; its *labels* are words on a screen, and the
-> studio should be able to rename an item without a deploy. `worker/bundle.ts`
+> studio should be able to rename an item without a deploy. `worker/domain/bundle.ts`
 > lifts them back out into `site` when it builds a revision, so the template's
 > `Dictionary` type never learns they exist.
 
