@@ -62,7 +62,31 @@ the previous deploy keeps serving. The live site cannot be broken from here.
 
 ## Setting it up
 
-### 1. The database and the bucket
+From nothing: a registered domain and these two repositories. The order below is
+load-bearing in three places, each flagged where it matters.
+
+Hostnames, decided once and wired everywhere:
+
+| | |
+|---|---|
+| `cafa-studio.com` | the site — CAFA-Template's Worker, apex only |
+| `admin.cafa-studio.com` | this editor |
+| `media.cafa-studio.com` | the R2 bucket, so transformations have an origin |
+
+### 1. The zone
+
+Add `cafa-studio.com` to Cloudflare as a zone and move its nameservers at the
+registrar. **Nothing else in this list works until the zone is active** — custom
+domains, the R2 domain and image transformations all hang off it.
+
+Then, on the zone: turn on **Image Transformations** (Images → Transformations),
+and add a **redirect rule** sending `www.cafa-studio.com` to the apex, 301.
+
+Transformations are the one that fails invisibly. Every photograph on the site
+is served through `/cdn-cgi/image/…`, so with it off the site builds, deploys
+and renders with every image broken.
+
+### 2. The database and the bucket
 
 ```sh
 npx wrangler d1 create cafa-content     # paste the id into wrangler.jsonc
@@ -70,26 +94,39 @@ npx wrangler r2 bucket create cafa-media
 npx wrangler d1 migrations apply cafa-content --remote
 ```
 
-Connect **`media.cafa-studio.com`** to the bucket in its R2 settings, so it
-matches `MEDIA_BASE` in `wrangler.jsonc`. That is where the template points
-image transformations, and it is a subdomain of the site's own zone on purpose
-— `/cdn-cgi/image/` runs on the zone serving the page, so an origin inside that
-same zone costs no second TLS handshake on the LCP path.
+`database_id` in `wrangler.jsonc` ships as a placeholder, because it is specific
+to your account. The first command prints the real one; nothing works until it
+is pasted in.
 
-Turn **Image Transformations** on for the `cafa-studio.com` zone while you are
-there (Images → Transformations). Without it every `/cdn-cgi/image/…` URL the
-template emits 404s, and since that is every photograph on the site, it is worth
-confirming on the first deploy rather than discovering later.
+Then connect **`media.cafa-studio.com`** to the bucket in its R2 settings, so it
+matches `MEDIA_BASE` in `wrangler.jsonc`. A subdomain of the site's own zone on
+purpose: `/cdn-cgi/image/` runs on the zone serving the page, so an origin
+inside that same zone costs no second TLS handshake on the LCP path.
 
-### 2. The content
+### 3. The content
 
-One-shot, from the JSON and photographs still in the template repository:
+The content is a one-shot import from the JSON the template used to carry and
+the photographs it still does. **The JSON is in the template's git history
+rather than its working tree** — it was deleted when this database became the
+source of truth, and a checked-in copy would be a second one, quietly going
+stale. So restore it, import, and throw it away again:
 
 ```sh
+cd ../CAFA-Template
+git checkout 19dadde -- src/content/    # the last commit that had them
+cd ../CAFA-Admin
+
 node scripts/import.mjs ../CAFA-Template
 npx wrangler d1 execute cafa-content --remote --file import/seed.sql
 sh import/upload.sh
+
+cd ../CAFA-Template && git reset -q -- src/content && rm -rf src/content
 ```
+
+(`git checkout <commit> -- <path>` stages what it restores, so the last line has
+to unstage before deleting, or the next commit resurrects the files.)
+
+That should report *10 works, 4 programmes, 6 mentors, 49 copy keys, 71 images*.
 
 The importer emits rather than executes, so both artefacts can be read before
 they are run. Both are re-runnable: the seed clears the tables it fills, and an
@@ -99,7 +136,7 @@ object put over an existing key replaces it.
 from the template repository — until then it is the only copy of the
 photographs outside git history, and the importer reads from it.
 
-### 3. A GitHub OAuth app
+### 4. A GitHub OAuth app
 
 Create one at **Settings → Developer settings → OAuth Apps**:
 
@@ -118,51 +155,76 @@ Anyone else is refused after the OAuth round trip, before a session exists.
 GitHub is only the sign-in now, so the scope is `read:user` — the token it
 returns cannot read or write a repository.
 
-### 4. Secrets
+### 5. Secrets
+
+Only the first three are needed to get the admin working. The deploy hooks come
+later, in step 7, because the thing they point at does not exist yet.
 
 ```sh
 npx wrangler secret put GITHUB_CLIENT_ID
 npx wrangler secret put GITHUB_CLIENT_SECRET
 npx wrangler secret put SESSION_SECRET            # 32+ random bytes
-npx wrangler secret put DEPLOY_HOOK_URL           # rebuilds the live site
-npx wrangler secret put PREVIEW_DEPLOY_HOOK_URL   # rebuilds the preview
-npx wrangler secret put PREVIEW_TOKEN             # lets the preview read the draft
 ```
 
 `SESSION_SECRET` both signs and encrypts the session cookie. Rotating it signs
 everyone out, which is the intended way to revoke access in a hurry.
 
-The three deploy-related secrets are optional. Without `DEPLOY_HOOK_URL`,
-publishing still writes a revision and simply does not trigger a build; without
-the preview pair there is no preview.
-
-### 5. Cloudflare, on the template repository
-
-Two Workers Builds environments, both building the template:
-
-1. **Production** — env
-   `CONTENT_API=https://admin.cafa-studio.com/api/content/published`. Create a
-   deploy hook for it and store the URL as `DEPLOY_HOOK_URL` here. Its
-   `wrangler.jsonc` binds the apex, `cafa-studio.com`.
-2. **Preview** — env `CONTENT_API=https://admin.cafa-studio.com/api/content/draft`
-   and `PREVIEW_TOKEN` matching the secret above. Its deploy hook becomes
-   `PREVIEW_DEPLOY_HOOK_URL`, and its alias becomes `PREVIEW_URL` in
-   `wrangler.jsonc`. Until that is set the admin simply shows no preview link.
-   The preview never answers on the custom domain — only the production
-   deployment does — so it keeps its own alias URL and the apex keeps serving
-   whatever was last published.
-
-Add a redirect rule on the zone sending `www.cafa-studio.com` to the apex,
-301. The Worker deliberately answers on the apex alone: two hostnames serving
-identical pages is a duplicate-content problem for canonical tags to clean up
-after, and a redirect is the cheaper answer.
-
-### 6. Deploy
+### 6. Deploy the admin, and publish once
 
 ```sh
 npm install
 npm run deploy
 ```
+
+`wrangler deploy` creates `admin.cafa-studio.com` from the `routes` entry in
+`wrangler.jsonc`. Sign in, confirm the content is there, and **press Publish**.
+
+That first publish matters more than it looks. A revision is a *snapshot* of the
+bundle, so until one exists `/api/content/published` answers 404 and the
+template has nothing to build from. Publishing before the site exists is the
+right way round.
+
+### 7. The site
+
+A Workers Builds project on **CAFA-Template**, building the default branch, with
+one environment variable:
+
+```
+CONTENT_API=https://admin.cafa-studio.com/api/content/published
+```
+
+Its `wrangler.jsonc` binds the apex, so the first successful build is also what
+puts `cafa-studio.com` on the air.
+
+Then close the loop: create a **deploy hook** for that project and store it back
+here, so publishing rebuilds the site instead of only writing a revision.
+
+```sh
+npx wrangler secret put DEPLOY_HOOK_URL
+```
+
+This is the third ordering that matters, and it is circular if you fight it: the
+hook cannot exist before the project does, and the project cannot build before
+something has been published. Publish first, wire the hook second.
+
+### 8. The preview — optional, and worth deferring
+
+A second Workers Builds environment on the same repository, env
+`CONTENT_API=https://admin.cafa-studio.com/api/content/draft` plus a
+`PREVIEW_TOKEN` matching the secret below. Its deploy hook becomes
+`PREVIEW_DEPLOY_HOOK_URL`, and its alias becomes `PREVIEW_URL` in
+`wrangler.jsonc`; until that is set the admin simply shows no preview link.
+
+```sh
+npx wrangler secret put PREVIEW_TOKEN             # lets the preview read the draft
+npx wrangler secret put PREVIEW_DEPLOY_HOOK_URL   # rebuilds the preview on save
+```
+
+The preview never answers on the custom domain — only the production deployment
+does — so it keeps its own alias URL and the apex keeps serving whatever was
+last published.
+
+Both are optional. Without them there is no preview, and everything else works.
 
 ## Developing
 
