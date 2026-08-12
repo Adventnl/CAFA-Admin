@@ -298,11 +298,11 @@ const GROUPS: CopyGroup[] = [
 
 const LOCALE_NAMES: Record<Locale, string> = { zh: '中文', en: 'English' };
 
-interface CopyEditorProps {
+interface CopyPageProps {
   editor: Editor;
 }
 
-export function CopyEditor({ editor }: CopyEditorProps) {
+export function CopyPage({ editor }: CopyPageProps) {
   const set = (locale: Locale, next: Dictionary) => editor.update(locale, next);
 
   return (

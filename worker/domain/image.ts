@@ -1,5 +1,11 @@
 /**
- * Photographs, in the bucket.
+ * What is true about a photograph before anything stores it.
+ *
+ * Pure functions over bytes and keys: no bucket, no database, nothing async.
+ * The bucket is worker/storage/media-storage.ts and the registry row is
+ * worker/repositories/media.repository.ts; this is the part both of them agree
+ * about, which is why it is the only one of the three that can be reasoned
+ * about — or tested — without a binding.
  *
  * Dimensions are read out of the uploaded bytes rather than taken from the
  * browser that sent them. They are not decoration: the template turns them into
@@ -70,12 +76,4 @@ export function isMediaKey(key: string): boolean {
 
 export function contentTypeOf(key: string): string {
   return key.endsWith('.png') ? 'image/png' : 'image/jpeg';
-}
-
-export async function putMedia(bucket: R2Bucket, key: string, body: ArrayBuffer): Promise<void> {
-  await bucket.put(key, body, { httpMetadata: { contentType: contentTypeOf(key) } });
-}
-
-export async function getMedia(bucket: R2Bucket, key: string): Promise<R2ObjectBody | null> {
-  return bucket.get(key);
 }

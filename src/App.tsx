@@ -1,32 +1,37 @@
 /**
- * The shell: sign in, load, and put one editor on screen at a time.
+ * The shell: establish a session, load the content once, then route.
+ *
+ * Three states before any page renders — checking, signed out, loaded — and
+ * they are separate on purpose. "Could not reach the site" and "you are not
+ * signed in" are different problems with different fixes, and collapsing them
+ * into one screen is how an expired cookie comes to look like an outage.
+ *
+ * The content is loaded once, here, and held for the session. Every page edits
+ * the same in-memory `ContentSet` through the same `Editor`, which is what lets
+ * a save be one transaction over the whole thing rather than six that could
+ * half-succeed.
  */
 import { useEffect, useState } from 'react';
 
-import { loadContent, whoami } from './api';
-import type { ContentSet, MediaInfo } from './content/types';
-import { CopyEditor } from './editors/CopyEditor';
-import { MentorsEditor } from './editors/MentorsEditor';
-import { ProgramsEditor } from './editors/ProgramsEditor';
-import { SiteEditor } from './editors/SiteEditor';
-import { WorksEditor } from './editors/WorksEditor';
+import { CopyPage } from './pages/CopyPage';
+import { HistoryPage } from './pages/HistoryPage';
+import { MentorsPage } from './pages/MentorsPage';
+import { ProgramsPage } from './pages/ProgramsPage';
+import { SignInPage } from './pages/SignInPage';
+import { SitePage } from './pages/SitePage';
+import { WorksPage } from './pages/WorksPage';
+import { useRoute, type RoutePath } from './routes';
+import { contentService } from './services/content';
+import { sessionService } from './services/session';
+import type { ContentResponse } from './services/types';
+import { AdminLayout } from './ui/AdminLayout';
+import { ProblemList } from './ui/ProblemList';
 import { useEditor } from './useEditor';
-import { PublishBar } from './ui/PublishBar';
-
-const SECTIONS = [
-  { id: 'works', label: 'Works' },
-  { id: 'programs', label: 'Programmes' },
-  { id: 'mentors', label: 'Mentors' },
-  { id: 'site', label: 'Studio & contact' },
-  { id: 'copy', label: 'Site text' },
-] as const;
-
-type SectionId = (typeof SECTIONS)[number]['id'];
 
 export function App() {
   const [login, setLogin] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
-  const [loaded, setLoaded] = useState<{ content: ContentSet; media: MediaInfo[] } | null>(null);
+  const [loaded, setLoaded] = useState<ContentResponse | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
   const signInError = new URLSearchParams(window.location.search).get('error');
@@ -34,9 +39,9 @@ export function App() {
   useEffect(() => {
     void (async () => {
       try {
-        const session = await whoami();
+        const session = await sessionService.whoami();
         setLogin(session?.login ?? null);
-        if (session !== null) setLoaded(await loadContent());
+        if (session !== null) setLoaded(await contentService.load());
       } catch (error) {
         setFailure(error instanceof Error ? error.message : 'Could not reach the site.');
       } finally {
@@ -46,35 +51,21 @@ export function App() {
   }, []);
 
   if (checking) return <p className="centred">Loading…</p>;
-
-  if (login === null) {
-    return (
-      <main className="centred sign-in">
-        <h1>c.a.f.a atelier — editor</h1>
-        <p>Sign in with the studio’s GitHub account to edit the site.</p>
-        {signInError !== null && <p className="problem">{signInError}</p>}
-        <a className="button button-primary" href="/auth/login">
-          Sign in with GitHub
-        </a>
-      </main>
-    );
-  }
-
+  if (login === null) return <SignInPage error={signInError} />;
   if (failure !== null) return <p className="centred problem">{failure}</p>;
   if (loaded === null) return <p className="centred">Loading the site…</p>;
 
-  return <Editing login={login} content={loaded.content} media={loaded.media} />;
+  return <Editing login={login} content={loaded} />;
 }
 
 interface EditingProps {
   login: string;
-  content: ContentSet;
-  media: MediaInfo[];
+  content: ContentResponse;
 }
 
-function Editing({ login, content, media }: EditingProps) {
-  const editor = useEditor(content, media);
-  const [section, setSection] = useState<SectionId>('works');
+function Editing({ login, content }: EditingProps) {
+  const editor = useEditor(content.content, content.media);
+  const route = useRoute();
 
   // The browser's own guard is the only one that catches a closed tab.
   useEffect(() => {
@@ -85,60 +76,31 @@ function Editing({ login, content, media }: EditingProps) {
   }, [editor.dirty]);
 
   return (
-    <div className="shell">
-      <header className="top">
-        <h1 className="wordmark">c.a.f.a atelier — editor</h1>
-        <PublishBar editor={editor} login={login} />
-      </header>
-
-      <div className="body">
-        <nav className="sidebar" aria-label="Sections">
-          <ul>
-            {SECTIONS.map((entry) => (
-              <li key={entry.id}>
-                <button
-                  type="button"
-                  className={`sidebar-link${section === entry.id ? ' is-current' : ''}`}
-                  aria-current={section === entry.id ? 'page' : undefined}
-                  onClick={() => setSection(entry.id)}
-                >
-                  {entry.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <a className="sidebar-link sidebar-out" href="/auth/logout">
-            Sign out
-          </a>
-        </nav>
-
-        <main className="main">
-          {editor.problems.length > 0 && (
-            <section className="problems" aria-live="polite">
-              <h2>
-                {editor.problems.length} {editor.problems.length === 1 ? 'thing' : 'things'} to fix
-                before this can be saved
-              </h2>
-              <ul>
-                {editor.problems.slice(0, 12).map((problem) => (
-                  <li key={`${problem.section}/${problem.record}/${problem.label}`}>
-                    <strong>{problem.record}</strong> — {problem.label} {problem.message}
-                  </li>
-                ))}
-              </ul>
-              {editor.problems.length > 12 && (
-                <p>…and {editor.problems.length - 12} more.</p>
-              )}
-            </section>
-          )}
-
-          {section === 'works' && <WorksEditor editor={editor} />}
-          {section === 'programs' && <ProgramsEditor editor={editor} />}
-          {section === 'mentors' && <MentorsEditor editor={editor} />}
-          {section === 'site' && <SiteEditor editor={editor} />}
-          {section === 'copy' && <CopyEditor editor={editor} />}
-        </main>
-      </div>
-    </div>
+    <AdminLayout editor={editor} login={login} route={route}>
+      <ProblemList problems={editor.problems} />
+      <Page route={route} editor={editor} />
+    </AdminLayout>
   );
+}
+
+/**
+ * The route table's one exhaustive switch. Adding a route to `ROUTES` without
+ * adding it here is a TypeScript error rather than a blank page — the return
+ * type has no `undefined` in it and the switch has no default.
+ */
+function Page({ route, editor }: { route: RoutePath; editor: ReturnType<typeof useEditor> }) {
+  switch (route) {
+    case 'works':
+      return <WorksPage editor={editor} />;
+    case 'programs':
+      return <ProgramsPage editor={editor} />;
+    case 'mentors':
+      return <MentorsPage editor={editor} />;
+    case 'site':
+      return <SitePage editor={editor} />;
+    case 'copy':
+      return <CopyPage editor={editor} />;
+    case 'history':
+      return <HistoryPage editor={editor} />;
+  }
 }

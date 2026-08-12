@@ -6,13 +6,13 @@
  * types should describe what the admin can actually change:
  *
  *  - **`SiteContent` has no `nav`, `locales` or `localeNames`.** Those are wired
- *    to the template's lib/routes.ts and to the deployment. worker/bundle.ts
+ *    to the template's lib/routes.ts and to the deployment. worker/domain/bundle.ts
  *    adds them when it builds a published revision, so the template still
  *    receives the complete record it expects.
  *  - **`Dictionary` has `nav` and `localeName`, which the template's does not.**
  *    The *shape* of the nav is code; the *words* in it are copy, and the studio
  *    should be able to rename an item without a deploy. They are stored as copy
- *    rows and lifted back out into `site` by worker/bundle.ts.
+ *    rows and lifted back out into `site` by worker/domain/bundle.ts.
  *
  * The copy cannot drift dangerously in either direction: the template re-parses
  * every field at build time, so a mismatch fails the build and never reaches
@@ -81,7 +81,7 @@ export interface Mentor {
 /**
  * No `url`. The site's origin is deployment configuration rather than content —
  * it comes from the PRODUCTION_URL var and is stamped into the published bundle
- * by worker/bundle.ts, which is also where the reasoning lives.
+ * by worker/domain/bundle.ts, which is also where the reasoning lives.
  */
 export interface SiteContent {
   name: LocalisedText;

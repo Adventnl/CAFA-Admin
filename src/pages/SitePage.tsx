@@ -12,11 +12,11 @@ import type { Editor } from '../useEditor';
 import { LocalisedField, moved, Repeatable, TextField } from '../ui/fields';
 import { ImageField } from '../ui/ImageField';
 
-interface SiteEditorProps {
+interface SitePageProps {
   editor: Editor;
 }
 
-export function SiteEditor({ editor }: SiteEditorProps) {
+export function SitePage({ editor }: SitePageProps) {
   const site = editor.content.site;
 
   const set = <K extends keyof SiteContent>(key: K, value: SiteContent[K]) =>

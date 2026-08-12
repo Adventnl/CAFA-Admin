@@ -66,7 +66,7 @@
     // The public site's origin, and now the only place that says where it is.
     //
     // Two things read it. The admin polls it for build-info.json, to answer "is
-    // what I published actually live". And worker/bundle.ts stamps it into the
+    // what I published actually live". And worker/domain/bundle.ts stamps it into the
     // published bundle as `site.url`, which is what the template builds every
     // canonical, hreflang, og:url and sitemap entry from — so a domain move is
     // this line plus a redeploy, not a database edit nobody remembers to make.

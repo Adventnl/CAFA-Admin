@@ -14,7 +14,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
-import { getStatus, publish, type SiteStatus } from '../api';
+import { publishService } from '../services/publish';
+import type { SiteStatus } from '../services/types';
 import type { Editor } from '../useEditor';
 
 /** How often to re-ask while a build is in flight. */
@@ -39,7 +40,7 @@ export function PublishBar({ editor, login }: PublishBarProps) {
 
   const refresh = useCallback(async () => {
     try {
-      setStatus(await getStatus());
+      setStatus(await publishService.status());
     } catch {
       // A failed status poll is not worth interrupting an edit over; the next
       // one will either succeed or the save will surface the real problem.
@@ -77,7 +78,7 @@ export function PublishBar({ editor, login }: PublishBarProps) {
     setBusy(true);
     setNotice(null);
     try {
-      const result = await publish();
+      const result = await publishService.publish();
       setNotice(
         result.published
           ? `Publishing revision ${result.revision}. The live site updates in a minute or two.`
