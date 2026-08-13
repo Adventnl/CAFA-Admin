@@ -13,7 +13,9 @@
  */
 import { useEffect, useState } from 'react';
 
+import { ControlPanelPage } from './pages/ControlPanelPage';
 import { CopyPage } from './pages/CopyPage';
+import { DevPanelPage } from './pages/DevPanelPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { MentorsPage } from './pages/MentorsPage';
 import { ProgramsPage } from './pages/ProgramsPage';
@@ -113,6 +115,10 @@ function Editing({ login, content, onSignedOut }: EditingProps) {
  */
 function Page({ route, editor }: { route: RoutePath; editor: ReturnType<typeof useEditor> }) {
   switch (route) {
+    case 'control':
+      return <ControlPanelPage editor={editor} />;
+    case 'dev':
+      return <DevPanelPage />;
     case 'works':
       return <WorksPage editor={editor} />;
     case 'programs':

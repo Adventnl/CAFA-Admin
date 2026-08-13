@@ -44,6 +44,23 @@ const NAV = [
 ] as const;
 
 /**
+ * The destinations a nav item can name, read back off the nav above.
+ *
+ * These exist so api.json can say `enum` rather than `string` on `NavItem`, and
+ * they are derived rather than retyped for the usual reason: a second list
+ * would be a copy of this one that nobody updates in the same commit. A client
+ * generating a route table from the document gets the real set, and adding a
+ * nav item widens the document in the same edit that widens the nav.
+ */
+export const NAV_ROUTES: readonly string[] = NAV.flatMap((item) =>
+  'route' in item ? [item.route] : [],
+);
+
+export const NAV_PANELS: readonly string[] = NAV.flatMap((item) =>
+  'opens' in item ? [item.opens] : [],
+);
+
+/**
  * Copy that describes the chrome rather than a page, and is lifted into `site`
  * instead of staying in the dictionary.
  *

@@ -11,11 +11,14 @@
  *   repositories/  D1. Rows in, domain objects out.
  *   storage/       R2.
  *   domain/        Pure: the bundle projection, the cookie seal, image headers.
+ *   connectors/    The public read API, declared: routes, shapes, api.json.
  *   shared/        The envelope, the exception, the filter, the router.
  *
  * Dependencies point down only. A repository has never heard of a Request.
  */
+import { DOCUMENT_PATH, CONNECTORS } from './connectors/registry';
 import { AuthController } from './controllers/auth.controller';
+import { ConnectorsController } from './controllers/connectors.controller';
 import { ContentController } from './controllers/content.controller';
 import { MediaController } from './controllers/media.controller';
 import { PublicContentController } from './controllers/public-content.controller';
@@ -25,12 +28,14 @@ import { SessionController } from './controllers/session.controller';
 import { readSession } from './domain/session';
 import type { Env } from './env';
 import { AuthService } from './services/auth.service';
+import { ConnectorService } from './services/connector.service';
 import { ContentService } from './services/content.service';
 import { DeployService } from './services/deploy.service';
 import { MediaService } from './services/media.service';
 import { PublishService } from './services/publish.service';
 import { ApiException } from './shared/api-exception';
 import { ApiResponse, toResponse } from './shared/api-response';
+import { allowAnyOrigin, isPublicRead } from './shared/cors';
 import { applyExceptionFilter } from './shared/exception-filter';
 import { Router } from './shared/router';
 
@@ -57,8 +62,9 @@ function compose(env: Env): Router {
   const publishController = new PublishController(publishing);
   const revisionsController = new RevisionsController(publishing);
   const publicController = new PublicContentController(publishing, auth);
+  const connectorsController = new ConnectorsController(new ConnectorService(publishing));
 
-  return (
+  const router = (
     new Router()
       // Sign-in. A username and a password checked here; the two routes that
       // set the cookie are the only ones that may be reached without it.
@@ -80,36 +86,56 @@ function compose(env: Env): Router {
       .authorize('GET', '/api/revisions', revisionsController.list)
       .authorize('POST', '/api/revisions/:id/restore', revisionsController.restore)
   );
+
+  // The public read API. Registered from the same list that compiles api.json,
+  // so a connector cannot be documented without being routed or the reverse —
+  // see worker/connectors/registry.ts.
+  for (const connector of CONNECTORS) {
+    router.allowAnonymous('GET', connector.path, connectorsController.action(connector));
+  }
+  router.allowAnonymous('GET', DOCUMENT_PATH, connectorsController.document);
+
+  return router;
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const matched = compose(env).resolve(request, url);
+    const answer = await respond(request, env, url);
 
-    if (matched === null) {
-      // An unclaimed /api path is a mistake worth naming. Anything else is a
-      // client route, and the SPA's asset handler owns it.
-      return url.pathname.startsWith('/api/')
-        ? toResponse(ApiResponse.fail(404, 'No such endpoint.'))
-        : env.ASSETS.fetch(request);
-    }
-
-    if (matched.kind === 'method-not-allowed') {
-      return toResponse(
-        ApiResponse.fail(405, `That endpoint takes ${matched.allowed.join(' or ')}.`),
-        { Allow: matched.allowed.join(', ') },
-      );
-    }
-
-    return applyExceptionFilter(async () => {
-      const context = { request, url, params: matched.params };
-      if (matched.kind === 'anonymous') return matched.handler(context);
-
-      const session = await readSession(request, env.SESSION_SECRET);
-      if (session === null) throw ApiException.unauthorized('Not signed in.');
-
-      return matched.handler({ ...context, user: { login: session.login } });
-    });
+    // Anything a frontend on another origin is meant to call says so here, in
+    // one place, including its errors. Nothing else in the API answers a
+    // cross-origin caller at all.
+    return isPublicRead(url) ? allowAnyOrigin(answer) : answer;
   },
 } satisfies ExportedHandler<Env>;
+
+/** Match, authenticate, dispatch. Everything but who is allowed to read it. */
+async function respond(request: Request, env: Env, url: URL): Promise<Response> {
+  const matched = compose(env).resolve(request, url);
+
+  if (matched === null) {
+    // An unclaimed /api path is a mistake worth naming. Anything else is a
+    // client route, and the SPA's asset handler owns it.
+    return url.pathname.startsWith('/api/')
+      ? toResponse(ApiResponse.fail(404, 'No such endpoint.'))
+      : env.ASSETS.fetch(request);
+  }
+
+  if (matched.kind === 'method-not-allowed') {
+    return toResponse(
+      ApiResponse.fail(405, `That endpoint takes ${matched.allowed.join(' or ')}.`),
+      { Allow: matched.allowed.join(', ') },
+    );
+  }
+
+  return applyExceptionFilter(async () => {
+    const context = { request, url, params: matched.params };
+    if (matched.kind === 'anonymous') return matched.handler(context);
+
+    const session = await readSession(request, env.SESSION_SECRET);
+    if (session === null) throw ApiException.unauthorized('Not signed in.');
+
+    return matched.handler({ ...context, user: { login: session.login } });
+  });
+}

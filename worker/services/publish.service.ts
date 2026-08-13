@@ -55,6 +55,11 @@ export interface BundleEnvelope {
   bundle: string;
 }
 
+/** The same snapshot, plus when it went live. What the read API answers from. */
+export interface PublishedSnapshot extends BundleEnvelope {
+  publishedAt: string;
+}
+
 export class PublishService {
   constructor(
     private readonly env: Env,
@@ -128,11 +133,23 @@ export class PublishService {
     return listRevisions(this.env.DB);
   }
 
-  /** What the production build reads. */
-  async publishedBundle(): Promise<BundleEnvelope> {
+  /**
+   * The newest revision, whole.
+   *
+   * One read, two callers: the build endpoint splices `bundle` into its answer
+   * without parsing it, and the read API parses it once and cuts views out of
+   * it. Both need the same "nothing has been published yet" answer, so the rule
+   * is stated here rather than twice.
+   */
+  async publishedSnapshot(): Promise<PublishedSnapshot> {
     const newest = await newestRevision(this.env.DB);
     if (newest === null) throw ApiException.notFound('Nothing has been published yet.');
-    return { revision: newest.id, bundle: newest.content };
+    return { revision: newest.id, bundle: newest.content, publishedAt: newest.published_at };
+  }
+
+  /** What the production build reads. */
+  async publishedBundle(): Promise<BundleEnvelope> {
+    return this.publishedSnapshot();
   }
 
   /** What the preview build reads. The draft has no id, so it gets a fingerprint. */

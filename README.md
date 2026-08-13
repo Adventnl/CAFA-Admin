@@ -9,7 +9,9 @@ photographs without touching code, then preview the result and publish it.
 One Cloudflare Worker serves both halves: the React editor as static assets, and
 the API that owns the content. The content is in D1 and the photographs are in
 R2. The site itself is a static export with no server runtime, so nothing is
-read at request time — the content is fetched once, by the site's build.
+read at request time — the content is fetched once, by the site's build. What is
+published is also readable endpoint by endpoint over a [public read
+API](#the-read-api), for anything else that wants the content.
 
 ```
 studio edits  →  saved to the live tables  →  preview build reads the draft
@@ -59,6 +61,86 @@ schema, rather than discovered at build time:
 
 If a save would still produce content the site cannot build, the build fails and
 the previous deploy keeps serving. The live site cannot be broken from here.
+
+## The two panels
+
+The admin opens on the **control panel**: what is published, whether the draft
+is ahead of it, whether each origin has caught up, and how much of everything
+there is. It writes nothing. Publishing stays in the bar at the top, where it is
+on every page.
+
+The last item in the sidebar is the **dev panel**, and it is for whoever is
+building the frontend rather than for the studio. It lists every public
+endpoint, what comes back from it, and lets you send the request and read the
+answer without leaving the page — and it offers `api.json`, which is what you
+hand to the other repository.
+
+## The read API
+
+Alongside the editor's own authenticated routes there is a public, read-only
+API — one GET per view of the content, no writes and no verbs but GET:
+
+```
+GET /api/v1/site              the studio, the nav, the locales, the media origin
+GET /api/v1/revision          which snapshot you are reading, and when it went live
+GET /api/v1/works             ?status=completed|in-progress|private
+GET /api/v1/works/{slug}
+GET /api/v1/programs          GET /api/v1/programs/{slug}
+GET /api/v1/mentors           GET /api/v1/mentors/{slug}
+GET /api/v1/copy/{locale}     every fixed word on the site, in one language
+GET /api/v1/photographs       ?prefix=works/ — URLs, dimensions and alt text
+GET /api/v1/bundle            all of the above in one answer, ~40 KB
+GET /api.json                 the OpenAPI 3.1 document, compiled from the above
+```
+
+Four things are true of all of them:
+
+- **They answer the newest published revision.** Never the draft — an
+  unpublished edit is exactly what should not be visible from outside, and the
+  one endpoint that serves the draft still requires the preview build's token.
+- **They answer `{ revision, data }`.** The revision travels with the data
+  because a client that caches anything needs to know what it cached, and
+  asking a second endpoint for it is a race. Failures answer the admin's
+  ordinary `{ success, code, msg }` envelope, because a failure has a sentence
+  in it worth showing to someone.
+- **Any origin may read them.** They carry only what is already on the public
+  website and none of them looks at the session cookie, so there is no
+  authority for a hostile page to borrow. The authenticated half answers no
+  cross-origin caller at all.
+- **They do not serve photographs.** Content names a photograph by its object
+  key; `site.mediaBase`, or the `url` on each entry of `/api/v1/photographs`,
+  resolves that key against `media.cafa-studio.com`. An `<img src>` reaches the
+  CDN directly and nothing is proxied through the Worker.
+
+### api.json is compiled, not committed
+
+There is no OpenAPI file in this repository, and that is deliberate. A checked-in
+document is a second copy of the route table that nobody updates in the same
+commit as the route. `worker/connectors/registry.ts` holds one array in which
+each entry carries its path, its prose, the shape of its answer and the function
+that produces it; `worker/index.ts` registers the routes from that array and
+`/api.json` is built from it per request. So adding a connector routes it,
+documents it, and gives it a card in the dev panel, in one edit — and the
+document can never describe an endpoint the Worker does not answer.
+
+The `servers` entry is the origin the document was fetched from, so the copy
+downloaded from a local `wrangler dev` points at localhost and the copy
+downloaded from the deployed admin points at the deployed admin. The scheme is
+forced to `https` for anything that is not loopback, because `url.origin`
+reports the scheme the *caller* used and a plain-HTTP fetch would otherwise bake
+`http://` into every generated client.
+
+### What api.json does not say
+
+It describes the read API and nothing else, which leaves four things a frontend
+needs and cannot infer: that a build should read `/api/content/published` rather
+than the `/api/v1/*` connectors, that photographs are rendered through
+`/cdn-cgi/image/` rather than pointed at directly, that the site must publish
+`build-info.json` for the control panel to know a deploy landed, and how the two
+deploy hooks are wired.
+
+[docs/Frontend.md](docs/Frontend.md) is those four things. Hand it over with
+`api.json`.
 
 ## Setting it up
 
@@ -276,12 +358,20 @@ worker/
     exception-filter.ts     where every throw becomes a response
     router.ts               the route table; [Authorize] and [AllowAnonymous]
     current-user.ts         who is asking
+    cors.ts                 which paths any origin may read, and nothing else
+
+  connectors/               the public read API, declared once
+    registry.ts             every connector: path, prose, shape, and reader
+    schema.ts               the shapes, as JSON Schema — mirrors src/content/types.ts
+    openapi.ts              api.json, compiled from the registry on the way out
+    connector.ts            what a connector is
 
   controllers/              HTTP in, HTTP out — one per resource
     auth · session · content · media · publish · revisions · public-content
+    connectors.controller.ts  one action, bound per connector, plus the document
 
   services/                 the rules
-    auth · content · media · publish · deploy
+    auth · content · media · publish · deploy · connector
 
   repositories/             D1: rows in, domain objects out
     content.repository.ts   the unit of work — one batch, one transaction
@@ -304,7 +394,9 @@ src/
   services/                 the only place the browser talks to the Worker
     http.ts                 unwraps the envelope; nothing else knows about fetch
     session · content · media · publish
-  pages/                    one per route, plus sign-in and history
+    connectors.ts           reads api.json — the dev panel keeps no list of its own
+  pages/                    one per route: the control panel, five editors,
+                            history and the dev panel, plus sign-in
   ui/                       the layout, the form vocabulary, the publish bar
   routes.ts                 the route table, and the whole of the client router
   useEditor.ts              what has changed, and how it gets sent
