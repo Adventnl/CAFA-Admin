@@ -18,10 +18,30 @@ interface AdminLayoutProps {
   editor: Editor;
   login: string;
   route: RoutePath;
+  onSignedOut: () => void;
   children: ReactNode;
 }
 
-export function AdminLayout({ editor, login, route, children }: AdminLayoutProps) {
+export function AdminLayout({ editor, login, route, onSignedOut, children }: AdminLayoutProps) {
+  /**
+   * A button rather than a link, because signing out is a POST now.
+   *
+   * The unsaved-changes question is asked here rather than left to the
+   * browser's `beforeunload`, because nothing unloads — the app returns to the
+   * sign-in screen in place, so this is the only place that can ask.
+   */
+  async function signOut() {
+    if (editor.dirty && !window.confirm('There are unsaved changes. Sign out anyway?')) return;
+
+    try {
+      await sessionService.signOut();
+    } finally {
+      // Whatever the network did, the studio asked to be signed out. A request
+      // that failed leaves a cookie behind on this browser and nowhere else.
+      onSignedOut();
+    }
+  }
+
   return (
     <div className="shell">
       <header className="top">
@@ -40,9 +60,9 @@ export function AdminLayout({ editor, login, route, children }: AdminLayoutProps
               </li>
             ))}
           </ul>
-          <a className="sidebar-link sidebar-out" href={sessionService.logoutUrl}>
+          <button className="sidebar-link sidebar-out" type="button" onClick={() => void signOut()}>
             Sign out
-          </a>
+          </button>
         </nav>
 
         <main className="main">{children}</main>

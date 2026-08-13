@@ -60,10 +60,10 @@ function compose(env: Env): Router {
 
   return (
     new Router()
-      // Browser navigations. GitHub is the sign-in; the account check is inside.
-      .allowAnonymous('GET', '/auth/login', authController.login)
-      .allowAnonymous('GET', '/auth/callback', authController.callback)
-      .allowAnonymous('GET', '/auth/logout', authController.logout)
+      // Sign-in. A username and a password checked here; the two routes that
+      // set the cookie are the only ones that may be reached without it.
+      .allowAnonymous('POST', '/auth/login', authController.login)
+      .allowAnonymous('POST', '/auth/logout', authController.logout)
 
       // The two build-time reads. Unwrapped on purpose — see the controller.
       .allowAnonymous('GET', '/api/content/published', publicController.published)

@@ -1,72 +1,56 @@
 /**
- * Signing in, which is entirely GitHub's job plus one comparison.
+ * Signing in: one name and one password, checked here.
  *
- * The account check is the whole access-control model. It happens after the
- * OAuth round trip because that is the first moment we know who signed in, and
- * it is the last thing that happens before a session is issued — so every route
- * behind `authorize` can take for granted that the studio is the one asking.
+ * This used to be a round trip through GitHub whose only real output was a
+ * login to compare against `OWNER_LOGIN`. The comparison was the whole
+ * access-control model, and it is still the whole access-control model — the
+ * difference is that the studio now proves who it is with a password this
+ * Worker verifies, instead of with an OAuth app that had to be registered,
+ * kept in step with the hostname, and trusted with a redirect.
  *
- * The scope is `read:user`. It used to be `repo`, because the repository was
- * the database; now the content is in D1 and GitHub is only the sign-in, so the
- * token this returns cannot read or write anything. That is why it is discarded
- * here rather than sealed into the cookie — a stolen session is worth a session
- * and nothing else.
+ * The credentials live in secrets rather than in D1. There is exactly one
+ * account, it changes about never, and a `wrangler secret put` is a shorter
+ * path to a new password than a table, a migration and a screen to edit it.
  */
+import { verifyPassword, isPasswordHash } from '../domain/password';
 import type { Env } from '../env';
 import { ApiException } from '../shared/api-exception';
+
+/** Deliberately the same sentence for both halves — see `signIn`. */
+const REFUSED = 'That username and password do not match.';
 
 export class AuthService {
   constructor(private readonly env: Env) {}
 
-  /** Where the browser is sent to sign in. */
-  authorizeUrl(redirectUri: string, state: string): string {
-    const authorize = new URL('https://github.com/login/oauth/authorize');
-    authorize.searchParams.set('client_id', this.env.GITHUB_CLIENT_ID);
-    authorize.searchParams.set('redirect_uri', redirectUri);
-    authorize.searchParams.set('scope', 'read:user');
-    authorize.searchParams.set('state', state);
-    return authorize.toString();
-  }
-
   /**
-   * The code from the callback, exchanged for a login — or a refusal.
+   * The login to seal into a session, or a refusal.
    *
-   * Every failure is an ApiException carrying the sentence the studio should
-   * read. The controller turns those into a redirect with `?error=`, because
-   * this arm of the flow is a browser navigation rather than a fetch.
+   * Two things are load-bearing about the shape of this. The password is
+   * verified even when the username is already wrong, so the answer takes the
+   * same few hundred milliseconds either way and the endpoint cannot be used to
+   * find out what the username is. And both failures say the same sentence, for
+   * the same reason.
    */
-  async exchange(code: string, redirectUri: string): Promise<string> {
-    const exchange = await fetch('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: this.env.GITHUB_CLIENT_ID,
-        client_secret: this.env.GITHUB_CLIENT_SECRET,
-        code,
-        redirect_uri: redirectUri,
-      }),
-    });
+  async signIn(username: string, password: string): Promise<string> {
+    const expectedUser = this.env.ADMIN_USERNAME;
+    const expectedHash = this.env.ADMIN_PASSWORD_HASH;
 
-    const granted = await exchange.json<{ access_token?: string }>();
-    if (typeof granted.access_token !== 'string') {
-      throw ApiException.unauthorized('GitHub refused the sign-in.');
+    if (!expectedUser || !expectedHash || !isPasswordHash(expectedHash)) {
+      throw new ApiException(
+        503,
+        'Sign-in is not configured on this deployment. Set ADMIN_USERNAME and ADMIN_PASSWORD_HASH.',
+      );
     }
 
-    const account = await fetch('https://api.github.com/user', {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${granted.access_token}`,
-        'User-Agent': 'cafa-admin',
-      },
-    });
-    if (!account.ok) throw ApiException.unauthorized('GitHub would not say who you are.');
+    // Both checks always run. `&&` would short-circuit the expensive one.
+    const nameMatches = username.trim().toLowerCase() === expectedUser.trim().toLowerCase();
+    const passwordMatches = await verifyPassword(password, expectedHash);
 
-    const { login } = await account.json<{ login: string }>();
-    if (login.toLowerCase() !== this.env.OWNER_LOGIN.toLowerCase()) {
-      throw ApiException.unauthorized(`${login} is not the studio account.`);
-    }
+    if (!nameMatches || !passwordMatches) throw ApiException.unauthorized(REFUSED);
 
-    return login;
+    // The configured spelling, not whatever case was typed: this is the name
+    // that ends up on every revision as `published_by`.
+    return expectedUser.trim();
   }
 
   /**

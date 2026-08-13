@@ -6,17 +6,17 @@
  * rather than opening into something attacker-shaped — which means there is no
  * session table to provision, expire or leak.
  *
- * It used to carry a GitHub token with `repo` scope, because the repository was
- * the database. It no longer does: the content is in D1, GitHub is only the
- * sign-in, and the OAuth scope is down to `read:user`. A stolen cookie is now
- * worth a session and nothing else.
+ * It used to carry a GitHub token, and there used to be a second sealed cookie
+ * holding an OAuth `state` across the round trip to github.com. Sign-in is now
+ * a username and a password posted to this Worker and answered by it, so there
+ * is no round trip, no state to carry, and nothing in the cookie but a name.
  */
+import { fromBase64Url, toBase64Url } from './base64url';
 
 const COOKIE = 'cafa_session';
-const STATE_COOKIE = 'cafa_oauth_state';
 
 /** A sealed payload is only valid for the thing it was sealed for. */
-type Purpose = 'session' | 'oauth-state';
+type Purpose = 'session';
 
 export interface Session {
   login: string;
@@ -37,21 +37,6 @@ async function keyFor(secret: string): Promise<CryptoKey> {
     'encrypt',
     'decrypt',
   ]);
-}
-
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
-}
-
-function fromBase64Url(value: string): Uint8Array<ArrayBuffer> | null {
-  try {
-    const binary = atob(value.replaceAll('-', '+').replaceAll('_', '/'));
-    return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-  } catch {
-    return null;
-  }
 }
 
 export async function seal<T>(
@@ -124,9 +109,16 @@ function read(request: Request, name: string): string | null {
 }
 
 /**
- * `SameSite=Lax` rather than `Strict`: the OAuth callback is a top-level
- * navigation from github.com, and under Strict the cookie set just before the
- * redirect would not come back.
+ * `SameSite=Strict` is affordable now that sign-in is a form post rather than a
+ * redirect back from github.com — nothing arrives here as a top-level
+ * navigation from another site any more. It is also the whole CSRF story: every
+ * write is a same-origin `fetch` from a page already on this hostname, and a
+ * form posted from anywhere else simply carries no cookie.
+ *
+ * The one visible consequence is that following a link to the admin from
+ * elsewhere does not send the cookie on that first document request. It does
+ * not matter: the document is the static SPA, and the session is established by
+ * the `/api/session` fetch the page makes, which is same-site.
  */
 function cookie(name: string, value: string, maxAge: number): string {
   return [
@@ -134,13 +126,12 @@ function cookie(name: string, value: string, maxAge: number): string {
     'Path=/',
     'HttpOnly',
     'Secure',
-    'SameSite=Lax',
+    'SameSite=Strict',
     `Max-Age=${maxAge}`,
   ].join('; ');
 }
 
 const SESSION_LIFETIME = 60 * 60 * 24 * 14;
-const STATE_LIFETIME = 60 * 10;
 
 export function sessionCookie(sealed: string): string {
   return cookie(COOKIE, sealed, SESSION_LIFETIME);
@@ -148,14 +139,6 @@ export function sessionCookie(sealed: string): string {
 
 export function clearedSessionCookie(): string {
   return cookie(COOKIE, '', 0);
-}
-
-export function stateCookie(sealed: string): string {
-  return cookie(STATE_COOKIE, sealed, STATE_LIFETIME);
-}
-
-export function clearedStateCookie(): string {
-  return cookie(STATE_COOKIE, '', 0);
 }
 
 export async function sealSession(secret: string, session: Session): Promise<string> {
@@ -169,12 +152,4 @@ export async function readSession(request: Request, secret: string): Promise<Ses
   return value;
 }
 
-export async function sealState(secret: string, state: string): Promise<string> {
-  return seal(secret, 'oauth-state', state, STATE_LIFETIME);
-}
-
-export async function readState(request: Request, secret: string): Promise<string | null> {
-  return open<string>(secret, 'oauth-state', read(request, STATE_COOKIE));
-}
-
-export { SESSION_LIFETIME, STATE_LIFETIME };
+export { SESSION_LIFETIME };

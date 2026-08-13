@@ -25,6 +25,10 @@ export interface SessionResponse {
   login: string;
 }
 
+export interface SignedOutResponse {
+  signedOut: true;
+}
+
 export interface ContentResponse {
   content: ContentSet;
   media: MediaInfo[];

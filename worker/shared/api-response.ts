@@ -41,7 +41,7 @@ export const ApiResponse = {
  * What a controller action may return.
  *
  * Most return an envelope and let the dispatcher serialise it. The handful that
- * cannot — a redirect through GitHub, the bytes of a photograph, the raw bundle
+ * cannot — the two that set a cookie, the bytes of a photograph, the raw bundle
  * a build reads — return a `Response` directly, which is the same escape hatch
  * `IActionResult` gives a veyra controller.
  */

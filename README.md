@@ -136,24 +136,23 @@ object put over an existing key replaces it.
 from the template repository — until then it is the only copy of the
 photographs outside git history, and the importer reads from it.
 
-### 4. A GitHub OAuth app
+### 4. The password
 
-Create one at **Settings → Developer settings → OAuth Apps**:
+There is one account. It signs in with a username and a password, both checked
+by this Worker — no third party, nothing to register, and nothing that has to be
+told when the admin's hostname changes.
 
-- **Homepage URL** — `https://admin.cafa-studio.com`
-- **Authorization callback URL** — `https://admin.cafa-studio.com/auth/callback`
+The password is never stored. What is stored is a PBKDF2-SHA256 verifier, which
+this prints and does not keep:
 
-The callback is the one that has to be exact. `handleLogin` builds the redirect
-from the request's own origin, so the Worker always sends whatever host you
-reached it on — but GitHub checks that against what is registered here and
-refuses anything else. **Moving the admin to a different hostname means editing
-this app**, or sign-in fails at the callback with a mismatch error rather than
-anywhere useful.
+```sh
+npm run set-password
+```
 
-Only the account named in `OWNER_LOGIN` (currently `adventnl`) can sign in.
-Anyone else is refused after the OAuth round trip, before a session exists.
-GitHub is only the sign-in now, so the scope is `read:user` — the token it
-returns cannot read or write a repository.
+It asks twice, with the echo off, and hands back one line to paste in the next
+step. The format is `pbkdf2$sha256$<iterations>$<salt>$<key>`, read back by
+`worker/domain/password.ts`; the iteration count travels inside the hash, so
+raising it later does not invalidate a password set today.
 
 ### 5. Secrets
 
@@ -161,13 +160,27 @@ Only the first three are needed to get the admin working. The deploy hooks come
 later, in step 7, because the thing they point at does not exist yet.
 
 ```sh
-npx wrangler secret put GITHUB_CLIENT_ID
-npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler secret put ADMIN_USERNAME            # what you type to sign in
+npx wrangler secret put ADMIN_PASSWORD_HASH       # the line from step 4
 npx wrangler secret put SESSION_SECRET            # 32+ random bytes
 ```
 
-`SESSION_SECRET` both signs and encrypts the session cookie. Rotating it signs
-everyone out, which is the intended way to revoke access in a hurry.
+A secret takes effect immediately — changing the password is those two commands
+again and no redeploy. It does *not* end sessions that are already open, because
+a session is a sealed cookie rather than a row someone can delete.
+
+`SESSION_SECRET` both signs and encrypts that cookie. Rotating it invalidates
+every cookie at once, which is the way to sign everyone out in a hurry.
+
+Until `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH` are both set, sign-in answers
+503 and says so, rather than letting anyone in.
+
+**On brute force.** There is no attempt counter — a Worker has nowhere to keep
+one without adding storage that exists for no other reason. What stands in for
+it is the cost of a guess: ~210,000 PBKDF2 iterations per attempt, paid by the
+Worker on every try, correct or not. Choose a password long enough that this
+matters; if the admin ever has more than one user, that is the moment to add
+Cloudflare's rate limiting in front of `/auth/login`.
 
 ### 6. Deploy the admin, and publish once
 
@@ -251,6 +264,7 @@ migrations/
   0001_initial.sql          the schema, and the constraints that are really rules
 scripts/
   import.mjs                the one-shot move from files to database
+  set-password.mjs          a password in, the ADMIN_PASSWORD_HASH line out
 
 worker/
   index.ts                  the composition root: build, declare routes, dispatch
@@ -282,6 +296,8 @@ worker/
     bundle.ts               what a published revision contains, and what it withholds
     image.ts                dimensions read from the file rather than trusted
     session.ts              AES-GCM sealed cookie — no session storage anywhere
+    password.ts             PBKDF2 verification, and the one hash format
+    base64url.ts            bytes ⇄ text, and a comparison that does not leak
 
 src/
   content/                  the shape of the content, and the rules a save must satisfy

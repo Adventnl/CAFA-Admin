@@ -95,6 +95,27 @@ h3 {
   margin-inline: auto;
 }
 
+/* Labels read left-aligned even though the screen around them is centred. */
+.sign-in-form {
+  width: min(22rem, 100%);
+  margin-inline: auto;
+  text-align: left;
+}
+
+.sign-in-form .field {
+  margin-bottom: var(--gap);
+}
+
+/* Present in the DOM even when empty, so a refusal is announced when it lands. */
+.sign-in-form .problem:empty {
+  display: none;
+}
+
+.sign-in-form .button {
+  width: 100%;
+  margin-top: 0.35rem;
+}
+
 /* ---------- shell ---------- */
 
 .shell {

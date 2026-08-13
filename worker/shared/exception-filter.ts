@@ -6,9 +6,9 @@
  * is the single place that decides what a thrown thing looks like on the wire.
  *
  * The default arm is deliberately 500 with the real message. This is a
- * one-person admin behind a GitHub account check; an operator reading the true
- * cause in the network tab is worth more than hiding it from an attacker who
- * would have to be signed in as the studio to see it at all.
+ * one-person admin behind a password; an operator reading the true cause in the
+ * network tab is worth more than hiding it from an attacker who would have to
+ * be signed in as the studio to see it at all.
  */
 import { ApiException } from './api-exception';
 import { ApiResponse, isResponse, toResponse, type ActionResult } from './api-response';

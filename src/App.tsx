@@ -34,14 +34,10 @@ export function App() {
   const [loaded, setLoaded] = useState<ContentResponse | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  const signInError = new URLSearchParams(window.location.search).get('error');
-
   useEffect(() => {
     void (async () => {
       try {
-        const session = await sessionService.whoami();
-        setLogin(session?.login ?? null);
-        if (session !== null) setLoaded(await contentService.load());
+        setLogin((await sessionService.whoami())?.login ?? null);
       } catch (error) {
         setFailure(error instanceof Error ? error.message : 'Could not reach the site.');
       } finally {
@@ -50,20 +46,47 @@ export function App() {
     })();
   }, []);
 
+  // Keyed on the login rather than folded into the check above, so the content
+  // loads the same way whether the session came back from the cookie or from
+  // the sign-in form a moment ago.
+  useEffect(() => {
+    if (login === null) return;
+    void (async () => {
+      try {
+        setLoaded(await contentService.load());
+      } catch (error) {
+        setFailure(error instanceof Error ? error.message : 'Could not reach the site.');
+      }
+    })();
+  }, [login]);
+
   if (checking) return <p className="centred">Loading…</p>;
-  if (login === null) return <SignInPage error={signInError} />;
+  if (login === null) return <SignInPage onSignedIn={(session) => setLogin(session.login)} />;
   if (failure !== null) return <p className="centred problem">{failure}</p>;
   if (loaded === null) return <p className="centred">Loading the site…</p>;
 
-  return <Editing login={login} content={loaded} />;
+  return (
+    <Editing
+      login={login}
+      content={loaded}
+      onSignedOut={() => {
+        // Back to the sign-in screen without a page load. `Editing` unmounts,
+        // which is what actually discards the edited content — there is no
+        // second copy of it anywhere, and nothing to clear by hand.
+        setLogin(null);
+        setLoaded(null);
+      }}
+    />
+  );
 }
 
 interface EditingProps {
   login: string;
   content: ContentResponse;
+  onSignedOut: () => void;
 }
 
-function Editing({ login, content }: EditingProps) {
+function Editing({ login, content, onSignedOut }: EditingProps) {
   const editor = useEditor(content.content, content.media);
   const route = useRoute();
 
@@ -76,7 +99,7 @@ function Editing({ login, content }: EditingProps) {
   }, [editor.dirty]);
 
   return (
-    <AdminLayout editor={editor} login={login} route={route}>
+    <AdminLayout editor={editor} login={login} route={route} onSignedOut={onSignedOut}>
       <ProblemList problems={editor.problems} />
       <Page route={route} editor={editor} />
     </AdminLayout>

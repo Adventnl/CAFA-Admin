@@ -1,29 +1,30 @@
 /**
- * /auth/login, /auth/callback, /auth/logout
+ * POST /auth/login, POST /auth/logout
  *
- * The only routes in the admin that answer with a redirect and a cookie rather
- * than an envelope, because all three are browser navigations rather than
- * fetches. A failure here therefore cannot be a 401 body — nobody would see it
- * — so it comes back as a redirect to `/` carrying `?error=`, which the sign-in
- * screen prints.
+ * Both answer the normal envelope and set a cookie, which is the whole reason
+ * they return a `Response` rather than letting the dispatcher serialise one:
+ * `Set-Cookie` is a header, and an envelope on its own has nowhere to put it.
  *
- * The redirect URI is derived from the request's own origin, so the value sent
- * to GitHub and the value GitHub calls back on agree by construction. GitHub
- * still checks it against what is registered on the OAuth app, which is why
- * moving this Worker's hostname means updating that registration too.
+ * These used to be redirects, because OAuth made them browser navigations and a
+ * navigation cannot read a 401 body. They are ordinary fetches now, so a
+ * refusal comes back as a refusal and the sign-in screen prints it in place —
+ * no `?error=` on the URL, and no reload between typing a password and being
+ * told it was wrong.
+ *
+ * POST rather than GET for both, including sign-out: neither is safe to
+ * repeat from a prefetch, a crawler, or an <img> tag someone else wrote.
  */
+import { sealSession, sessionCookie, clearedSessionCookie } from '../domain/session';
+import type { SessionResponse, SignedOutResponse } from '../models/dtos/session.dtos';
 import type { AuthService } from '../services/auth.service';
 import { ApiException } from '../shared/api-exception';
+import { ApiResponse, toResponse } from '../shared/api-response';
 import type { RequestContext } from '../shared/router';
-import {
-  clearedSessionCookie,
-  clearedStateCookie,
-  readState,
-  sealSession,
-  sealState,
-  sessionCookie,
-  stateCookie,
-} from '../domain/session';
+
+interface Credentials {
+  username?: unknown;
+  password?: unknown;
+}
 
 export class AuthController {
   constructor(
@@ -31,63 +32,31 @@ export class AuthController {
     private readonly sessionSecret: string,
   ) {}
 
-  login = async ({ url }: RequestContext): Promise<Response> => {
-    const state = crypto.randomUUID();
-    const redirectUri = new URL('/auth/callback', url.origin).toString();
+  login = async ({ request }: RequestContext): Promise<Response> => {
+    const { username, password } = await request.json<Credentials>();
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: this.auth.authorizeUrl(redirectUri, state),
-        'Set-Cookie': stateCookie(await sealState(this.sessionSecret, state)),
-      },
+    if (typeof username !== 'string' || typeof password !== 'string') {
+      throw ApiException.badRequest('Send a username and a password.');
+    }
+    if (username === '' || password === '') {
+      throw ApiException.badRequest('Fill in both fields.');
+    }
+
+    const login = await this.auth.signIn(username, password);
+    const sealed = await sealSession(this.sessionSecret, { login });
+
+    return toResponse(ApiResponse.ok<SessionResponse>({ login }, 'Signed in'), {
+      'Set-Cookie': sessionCookie(sealed),
     });
   };
 
-  callback = async ({ request, url }: RequestContext): Promise<Response> => {
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
-    const expected = await readState(request, this.sessionSecret);
-
-    if (code === null || state === null || expected === null || state !== expected) {
-      return refuse('That sign-in link expired. Try again.');
-    }
-
-    let login: string;
-    try {
-      login = await this.auth.exchange(code, new URL('/auth/callback', url.origin).toString());
-    } catch (error) {
-      return refuse(
-        error instanceof ApiException ? error.message : 'The sign-in could not be completed.',
-      );
-    }
-
-    // Only the login is kept. There is no longer a token worth storing.
-    return new Response(null, {
-      status: 302,
-      headers: [
-        ['Location', '/'],
-        ['Set-Cookie', sessionCookie(await sealSession(this.sessionSecret, { login }))],
-        ['Set-Cookie', clearedStateCookie()],
-      ],
-    });
-  };
-
+  /**
+   * Anonymous on purpose. Signing out of a session that already expired is the
+   * same request as signing out of a live one, and it should not answer 401.
+   */
   logout = (): Response => {
-    return new Response(null, {
-      status: 302,
-      headers: { Location: '/', 'Set-Cookie': clearedSessionCookie() },
+    return toResponse(ApiResponse.ok<SignedOutResponse>({ signedOut: true }, 'Signed out'), {
+      'Set-Cookie': clearedSessionCookie(),
     });
   };
-}
-
-/** Back to the sign-in screen with something the studio can read. */
-function refuse(reason: string): Response {
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: `/?error=${encodeURIComponent(reason)}`,
-      'Set-Cookie': clearedStateCookie(),
-    },
-  });
 }

@@ -71,7 +71,7 @@ function capture(template: readonly string[], actual: readonly string[]) {
 export class Router {
   private readonly routes: Registered[] = [];
 
-  /** No session required. The OAuth dance and the two build-time reads. */
+  /** No session required. Signing in and out, and the two build-time reads. */
   allowAnonymous(method: Method, template: string, handler: Handler<RequestContext>): this {
     this.routes.push({ method, template: segmentsOf(template), authorize: false, handler });
     return this;

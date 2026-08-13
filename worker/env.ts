@@ -12,7 +12,6 @@ export interface Env {
   DB: D1Database;
   MEDIA: R2Bucket;
 
-  OWNER_LOGIN: string;
   /** Where the originals are served from, so the template can transform them. */
   MEDIA_BASE: string;
   /**
@@ -23,8 +22,10 @@ export interface Env {
   PRODUCTION_URL: string;
   PREVIEW_URL?: string;
 
-  GITHUB_CLIENT_ID: string;
-  GITHUB_CLIENT_SECRET: string;
+  /** The one account that may sign in. */
+  ADMIN_USERNAME: string;
+  /** Its password, as `pbkdf2$sha256$…` — see worker/domain/password.ts. */
+  ADMIN_PASSWORD_HASH: string;
   SESSION_SECRET: string;
 
   /** Cloudflare deploy hooks. Absent means that half simply does not fire. */

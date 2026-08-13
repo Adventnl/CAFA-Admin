@@ -11,10 +11,8 @@
   // Cloudflare owns the DNS record and the certificate and there is no
   // fall-through to an origin — the Worker is the origin.
   //
-  // Changing this means changing the GitHub OAuth app's callback URL to match:
-  // handleLogin derives the redirect from the request's own origin, so the two
-  // agree by construction, but GitHub still checks it against what is
-  // registered. See README §3.
+  // Free to change: sign-in is a form posted back to this same Worker, so
+  // nothing outside this file has to be told the hostname moved.
   "routes": [{ "pattern": "admin.cafa-studio.com", "custom_domain": true }],
 
   "assets": {
@@ -50,10 +48,6 @@
   ],
 
   "vars": {
-    // The only GitHub account allowed to sign in. Everyone else is refused
-    // after the OAuth round trip, before a session is ever issued.
-    "OWNER_LOGIN": "adventnl",
-
     // Where the R2 originals are served from. The template appends the object
     // key to this and asks Cloudflare to transform the result, so it is the one
     // place that decides where photographs come from.
@@ -80,8 +74,8 @@
   }
 
   // Secrets, set with `wrangler secret put <name>`:
-  //   GITHUB_CLIENT_ID         — the OAuth app's client id
-  //   GITHUB_CLIENT_SECRET     — the OAuth app's client secret
+  //   ADMIN_USERNAME           — the one account that may sign in
+  //   ADMIN_PASSWORD_HASH      — its password; `npm run set-password` prints it
   //   SESSION_SECRET           — 32+ random bytes; signs and encrypts the cookie
   //   DEPLOY_HOOK_URL          — poked on publish; rebuilds the live site
   //   PREVIEW_DEPLOY_HOOK_URL  — poked on save; rebuilds the preview
