@@ -21,6 +21,20 @@
  * of the fourth "nothing in this repository can detect that". This is the file
  * that changes that sentence, and with --fix it repairs what it finds.
  *
+ * The fourth is the one --fix cannot always reach. Image Transformations are a
+ * paid-plan zone setting: on a Free zone the API returns the setting with
+ * `editable: false`, and a PATCH is refused no matter what the token carries.
+ * So the shape of that URL is not a constant here — MEDIA_TRANSFORM decides it,
+ * the published bundle carries the decision as `mediaTransform`, and a site
+ * whose zone cannot transform points at the originals instead:
+ *
+ *   https://media.cafa-studio.com/works/<slug>/01.jpg
+ *
+ * which is a working site paying in bytes rather than a broken one. What this
+ * script checks, then, is not "are transformations on" but "does the zone agree
+ * with what the deployed admin is publishing" — and it says so in whichever
+ * direction they disagree.
+ *
  *   CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… npm run media
  *   CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… npm run media -- --fix
  *
@@ -127,6 +141,10 @@ async function readWranglerConfig() {
   const mediaBase = config.vars?.MEDIA_BASE;
   const siteUrl = config.vars?.PRODUCTION_URL;
   const adminHost = config.routes?.[0]?.pattern;
+  // The same reading worker/domain/bundle.ts gives it: only a word that plainly
+  // says off turns it off, and absent means the documented setup.
+  const said = String(config.vars?.MEDIA_TRANSFORM ?? '').trim().toLowerCase();
+  const wantsTransform = said !== 'off' && said !== 'false' && said !== '0';
 
   for (const [name, value] of Object.entries({ bucket, mediaBase, siteUrl, adminHost })) {
     if (typeof value !== 'string' || value === '') {
@@ -140,6 +158,7 @@ async function readWranglerConfig() {
     mediaHost: new URL(mediaBase).hostname,
     siteUrl: siteUrl.replace(/\/$/, ''),
     adminUrl: `https://${adminHost}`,
+    wantsTransform,
   };
 }
 
@@ -196,6 +215,7 @@ async function cfOrNull(endpoint) {
 
 const rows = [];
 const problems = [];
+const notes = [];
 let allWell = true;
 
 /**
@@ -208,6 +228,15 @@ function report(label, detail, state, fault) {
     problems.push(fault);
     allWell = false;
   }
+}
+
+/**
+ * Something true and worth saying that is not a failure — the site works, and
+ * could work better. Kept apart from `problems` because the exit code is what a
+ * deploy gates on, and a deploy should not be blocked by an opportunity.
+ */
+function advise(sentence) {
+  notes.push(sentence);
 }
 
 /**
@@ -229,9 +258,11 @@ function print(offerFix = true) {
 
   if (problems.length === 0) {
     console.log('Every link holds. A photograph on the site loads.\n');
+    for (const note of notes) console.log(`${note}\n`);
     return;
   }
   for (const problem of problems) console.log(`${problem}\n`);
+  for (const note of notes) console.log(`${note}\n`);
   if (!FIX && offerFix) {
     console.log('Re-run with --fix to repair what can be repaired from the API.\n');
   }
@@ -330,11 +361,20 @@ async function checkCustomDomain({ bucket, mediaHost }, zone) {
 }
 
 /**
- * `image_resizing` is the zone setting behind Images → Transformations. On some
- * plans it is readable and not writable, which is worth saying plainly rather
- * than reporting as a failure to enable something.
+ * `image_resizing` is the zone setting behind Images → Transformations, and the
+ * one link in this chain that money rather than configuration can block.
+ *
+ * The API answers with `editable`, and on a Free zone it is `false` with
+ * `value: "off"`. That is not a permissions problem and no token fixes it, so
+ * --fix does not try: it would fail, and a failed repair reads like a bug in
+ * this script rather than the plan gate it is.
+ *
+ * `wants` is what the deployed admin is publishing — `mediaTransform` in the
+ * bundle — because the setting is only wrong relative to what the site asks
+ * for. Off is a fault when the site builds /cdn-cgi/image/ URLs, and simply the
+ * arrangement when it does not.
  */
-async function checkTransformations(zone) {
+async function checkTransformations(zone, wants) {
   let setting;
   try {
     setting = await cf(`/zones/${zone.id}/settings/image_resizing`);
@@ -351,8 +391,55 @@ async function checkTransformations(zone) {
 
   // "open" is on, and additionally allows sources outside the zone. Both serve
   // this site, whose source is a subdomain of the zone itself.
-  if (setting.value === 'on' || setting.value === 'open') {
-    report('transformations', zone.name, `on${setting.value === 'open' ? ' (any origin)' : ''}`);
+  const on = setting.value === 'on' || setting.value === 'open';
+  const gated = setting.editable === false;
+
+  if (on) {
+    const state = `on${setting.value === 'open' ? ' (any origin)' : ''}`;
+    if (wants) {
+      report('transformations', zone.name, state);
+      return;
+    }
+    report('transformations', zone.name, `${state}, and unused`);
+    advise(
+      `${zone.name} can transform images, but MEDIA_TRANSFORM says off, so the site is\n` +
+        `serving full-size originals it does not have to. Remove that var from\n` +
+        `wrangler.jsonc — or set it to "on" — then redeploy and publish once.`,
+    );
+    return;
+  }
+
+  if (!wants) {
+    report('transformations', zone.name, gated ? 'off — not available on this plan' : 'off, as configured');
+    advise(
+      gated
+        ? `Image Transformations are a paid-plan setting and ${zone.name} is on a plan without\n` +
+          `them, so the site points <img> at the originals instead. That works — it costs\n` +
+          `bytes on the LCP path, not correctness. Upgrading the zone to Pro and enabling\n` +
+          `Images → Transformations is what unlocks the fast path; drop MEDIA_TRANSFORM\n` +
+          `from wrangler.jsonc afterwards, redeploy, and publish once.`
+        : `Transformations are off for ${zone.name} and the site is not asking for them, so\n` +
+          `photographs are served full size. Turn them on at Cloudflare → ${zone.name} →\n` +
+          `Images → Transformations and drop MEDIA_TRANSFORM to use them.`,
+    );
+    return;
+  }
+
+  // Wanted, and off. From here it is a fault; the only question is whether the
+  // repair is a PATCH or a plan.
+  if (gated) {
+    report(
+      'transformations',
+      zone.name,
+      'off, and not editable on this plan',
+      `Image Transformations are off for ${zone.name} and cannot be turned on from the API:\n` +
+        `the setting reports itself as not editable, which is what a plan without them looks\n` +
+        `like. Meanwhile the site requests every photograph through /cdn-cgi/image/, so it\n` +
+        `renders with all of them broken. Two ways out, and both are one line:\n` +
+        `  • upgrade ${zone.name} to Pro, enable Images → Transformations, publish once; or\n` +
+        `  • set "MEDIA_TRANSFORM": "off" in wrangler.jsonc, redeploy the admin and publish\n` +
+        `    once — the site then renders the originals, which load.`,
+    );
     return;
   }
 
@@ -360,7 +447,7 @@ async function checkTransformations(zone) {
     report(
       'transformations',
       zone.name,
-      `off`,
+      'off',
       `Image Transformations are off for ${zone.name}. Every photograph is requested\n` +
         `through /cdn-cgi/image/, so with this off the site renders with all of them broken.`,
     );
@@ -379,7 +466,10 @@ async function checkTransformations(zone) {
       zone.name,
       `off, and could not be turned on — ${error.message}`,
       `Image Transformations could not be enabled over the API. Turn them on at\n` +
-        `  Cloudflare → ${zone.name} → Images → Transformations → Enable for this zone.`,
+        `  Cloudflare → ${zone.name} → Images → Transformations → Enable for this zone.\n` +
+        `If that page offers an upgrade rather than a switch, the plan is the reason —\n` +
+        `set "MEDIA_TRANSFORM": "off" in wrangler.jsonc instead and the site will render\n` +
+        `the originals until the zone can transform them.`,
     );
   }
 }
@@ -387,8 +477,14 @@ async function checkTransformations(zone) {
 /* ----------------------------------------------------------------- live --- */
 
 /**
- * A real key, from what the admin has actually published — so the two fetches
- * below test the site's own photographs rather than a URL this script invented.
+ * A real key, from what the admin has actually published — so the fetches below
+ * test the site's own photographs rather than a URL this script invented.
+ *
+ * `mediaTransform` is read from here rather than from wrangler.jsonc for the
+ * same reason `mediaBase` is: the site is built from the deployed answer, and a
+ * var edited in this checkout and never deployed is invisible from every other
+ * angle. Absent means an admin deployed before the field existed, which is
+ * itself worth saying.
  */
 async function readPublished(adminUrl) {
   const response = await fetch(`${adminUrl}/api/content/published`);
@@ -396,17 +492,53 @@ async function readPublished(adminUrl) {
     throw new Error(`${adminUrl}/api/content/published answered ${response.status}`);
   }
   const payload = await response.json();
-  const media = payload?.bundle?.media ?? {};
-  return { mediaBase: payload?.bundle?.mediaBase, key: Object.keys(media)[0] ?? null };
+  const bundle = payload?.bundle ?? {};
+  return {
+    mediaBase: bundle.mediaBase,
+    transform: bundle.mediaTransform,
+    key: Object.keys(bundle.media ?? {})[0] ?? null,
+  };
+}
+
+/** wrangler.jsonc against the deployed answer, in both directions. */
+function checkTransformFlag(config, published) {
+  if (typeof published.transform !== 'boolean') {
+    report(
+      'transform flag',
+      config.adminUrl,
+      'not published',
+      `The deployed admin publishes no \`mediaTransform\` field, so it is running a build\n` +
+        `from before that field existed and the site is guessing at the URL shape. Deploy\n` +
+        `this checkout and publish once.`,
+    );
+    return;
+  }
+
+  const deployed = published.transform ? 'on' : 'off';
+  if (published.transform === config.wantsTransform) {
+    report('transform flag', config.adminUrl, `${deployed} — same as wrangler.jsonc`);
+    return;
+  }
+
+  report(
+    'transform flag',
+    config.adminUrl,
+    `${deployed}, wrangler.jsonc says ${config.wantsTransform ? 'on' : 'off'}`,
+    `The deployed admin publishes mediaTransform ${deployed}, but MEDIA_TRANSFORM in\n` +
+      `wrangler.jsonc reads ${config.wantsTransform ? 'on' : 'off'}. The site is built from the deployed value —\n` +
+      `redeploy the admin and publish once, so the revision the site reads carries it.`,
+  );
 }
 
 /** Both live fetches, in the order the browser makes them. */
-async function checkLive(config) {
-  let published;
-  try {
-    published = await readPublished(config.adminUrl);
-  } catch (error) {
-    report('published bundle', config.adminUrl, error.message, `Could not read the published content: ${error.message}`);
+async function checkLive(config, published) {
+  if (!published.ok) {
+    report(
+      'published bundle',
+      config.adminUrl,
+      published.error.message,
+      `Could not read the published content: ${published.error.message}`,
+    );
     return;
   }
 
@@ -436,6 +568,8 @@ async function checkLive(config) {
     report('published bundle', config.adminUrl, `mediaBase ${base}`);
   }
 
+  checkTransformFlag(config, published);
+
   const origin = `${base}/${published.key}`;
   let originOk = false;
   try {
@@ -456,6 +590,14 @@ async function checkLive(config) {
     report('media origin', origin, error.message, `${origin} could not be reached: ${error.message}`);
   }
 
+  // With the flag off the URL above *is* the one in the site's HTML, and it has
+  // just been fetched. Fetching it again through a transform the site does not
+  // ask for would report a failure nobody has.
+  if (published.transform === false) {
+    report('browser fetch', origin, 'the original, untransformed');
+    return;
+  }
+
   // The URL the site's HTML actually carries, options and all.
   const transformed = `${config.siteUrl}/cdn-cgi/image/width=64,quality=78,format=auto,fit=scale-down/${origin}`;
   try {
@@ -470,7 +612,8 @@ async function checkLive(config) {
         ? undefined
         : originOk
           ? `The origin serves the photograph but the transformation does not. That is the\n` +
-            `zone's Image Transformations setting, above.`
+            `zone's Image Transformations setting, above — and if that setting is not editable,\n` +
+            `"MEDIA_TRANSFORM": "off" in wrangler.jsonc is how the site stops asking for it.`
           : `The transformation cannot succeed while the origin above does not.`,
     );
   } catch (error) {
@@ -520,8 +663,21 @@ async function main() {
   if (await checkBucket(config.bucket)) {
     await checkCustomDomain(config, zone);
   }
-  await checkTransformations(zone);
-  await checkLive(config);
+
+  // Read before the zone setting is judged, because whether that setting is
+  // wrong depends on what the deployed admin is publishing. Reported later, so
+  // the rows still come out in the order a photograph travels them.
+  const published = await readPublished(config.adminUrl).then(
+    (result) => ({ ok: true, ...result }),
+    (error) => ({ ok: false, error }),
+  );
+  const wants =
+    published.ok && typeof published.transform === 'boolean'
+      ? published.transform
+      : config.wantsTransform;
+
+  await checkTransformations(zone, wants);
+  await checkLive(config, published);
 
   print();
   process.exit(allWell ? 0 : 1);

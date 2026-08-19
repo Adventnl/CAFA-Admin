@@ -73,7 +73,13 @@ export class PublishService {
       readMedia(this.env.DB),
     ]);
     return JSON.stringify(
-      buildBundle(content, media, this.env.MEDIA_BASE, this.env.PRODUCTION_URL),
+      buildBundle(
+        content,
+        media,
+        this.env.MEDIA_BASE,
+        this.env.PRODUCTION_URL,
+        this.env.MEDIA_TRANSFORM,
+      ),
     );
   }
 

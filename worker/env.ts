@@ -15,6 +15,12 @@ export interface Env {
   /** Where the originals are served from, so the template can transform them. */
   MEDIA_BASE: string;
   /**
+   * `off` when the zone cannot run Image Transformations — it is a paid-plan
+   * setting, and on a Free zone `image_resizing` reads back as not editable.
+   * Travels into the bundle as `mediaTransform`; see worker/domain/bundle.ts.
+   */
+  MEDIA_TRANSFORM?: string;
+  /**
    * The public site's origin. Polled for build-info.json, and stamped into the
    * published bundle as `site.url` — see worker/domain/bundle.ts for why it
    * lives here rather than in the database.

@@ -108,9 +108,11 @@ Four things are true of all of them:
   authority for a hostile page to borrow. The authenticated half answers no
   cross-origin caller at all.
 - **They do not serve photographs.** Content names a photograph by its object
-  key; `site.mediaBase`, or the `url` on each entry of `/api/v1/photographs`,
-  resolves that key against `media.cafa-studio.com`. An `<img src>` reaches the
-  CDN directly and nothing is proxied through the Worker.
+  key; `mediaBase` on the bundle, or the `url` on each entry of
+  `/api/v1/photographs`, resolves that key against `media.cafa-studio.com`. An
+  `<img src>` reaches the CDN directly and nothing is proxied through the
+  Worker. `mediaTransform` on the bundle says whether that URL is fetched
+  through `/cdn-cgi/image/` first.
 
 ### api.json is compiled, not committed
 
@@ -134,10 +136,10 @@ reports the scheme the *caller* used and a plain-HTTP fetch would otherwise bake
 
 It describes the read API and nothing else, which leaves four things a frontend
 needs and cannot infer: that a build should read `/api/content/published` rather
-than the `/api/v1/*` connectors, that photographs are rendered through
-`/cdn-cgi/image/` rather than pointed at directly, that the site must publish
-`build-info.json` for the control panel to know a deploy landed, and how the two
-deploy hooks are wired.
+than the `/api/v1/*` connectors, that `mediaTransform` decides whether a
+photograph is fetched through `/cdn-cgi/image/` or straight from the bucket,
+that the site must publish `build-info.json` for the control panel to know a
+deploy landed, and how the two deploy hooks are wired.
 
 [docs/Frontend.md](docs/Frontend.md) is those four things. Hand it over with
 `api.json`.
@@ -158,19 +160,40 @@ two fail silently.** Content publishes, the build fetches it, `next build`
 writes correct HTML, the deploy goes green, and every photograph on the live
 site is a broken image. There is no error anywhere to read.
 
+The fourth is the one that cannot always be arranged. Image Transformations are
+a paid-plan zone setting: on a Free zone the API reports `image_resizing` as
+readable and **not editable**, so no token and no `--fix` turns it on.
+`MEDIA_TRANSFORM` is the answer to that — set it to `"off"` and the published
+bundle carries `mediaTransform: false`, which tells the site to render
+
+```
+https://media.cafa-studio.com/works/<slug>/01.jpg
+```
+
+directly instead. The photographs are the ≤2400px versions the editor
+downscales to on upload, so the page costs more bytes and nothing else. Remove
+the var once the zone can transform, redeploy, and publish once.
+
 ```sh
 npm run media           # report
 npm run media -- --fix  # repair what the API can repair, then report
 ```
 
-It reads the bucket, `MEDIA_BASE` and `PRODUCTION_URL` out of `wrangler.jsonc`,
-so it is checking the deployment rather than a second copy of its hostnames.
-The last two checks are the ones worth having: it takes a real object key from
-what the admin has actually published and fetches it twice, once from the media
-origin and once through the transformation — which is what a browser does on the
-live site, so passing is the site working rather than a proxy for it. It reads
-the *deployed* Worker's `mediaBase` rather than this checkout's, so a var edited
-and never deployed shows up as the mismatch it is.
+It reads the bucket, `MEDIA_BASE`, `MEDIA_TRANSFORM` and `PRODUCTION_URL` out
+of `wrangler.jsonc`, so it is checking the deployment rather than a second copy
+of its hostnames. The last checks are the ones worth having: it takes a real
+object key from what the admin has actually published and fetches it the way a
+browser would — from the media origin, and then through the transformation if
+that is what the site asks for — so passing is the site working rather than a
+proxy for it. It reads the *deployed* Worker's `mediaBase` and `mediaTransform`
+rather than this checkout's, so a var edited and never deployed shows up as the
+mismatch it is.
+
+Because it judges the zone against what the site publishes, it complains in
+both directions: transformations off while the site asks for them is the broken
+site, and transformations available while `MEDIA_TRANSFORM` says off is a note
+rather than a failure — the site works, it is just paying for a fast path it
+already has.
 
 Exit code is 0 only when every link holds, so a deploy can gate on it.
 
@@ -200,6 +223,12 @@ Transformations are the one that fails invisibly. Every photograph on the site
 is served through `/cdn-cgi/image/…`, so with it off the site builds, deploys
 and renders with every image broken. `npm run media` is the check that catches
 it — see [Checking that photographs load](#checking-that-photographs-load).
+
+**They are a paid-plan setting.** If the zone is on Free, that page offers an
+upgrade rather than a switch, and the API reports the setting as not editable.
+Set `"MEDIA_TRANSFORM": "off"` in `wrangler.jsonc` and the site renders the
+originals from R2 instead — larger files, working page — until the zone is on a
+plan that can transform them.
 
 ### 2. The database and the bucket
 

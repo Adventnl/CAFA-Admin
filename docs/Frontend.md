@@ -39,31 +39,54 @@ Both read the same published revision. If the site is statically generated, the
 `/api/v1/*` endpoints are not on its critical path at all — do not build pages
 out of them because they are the ones that happen to be documented.
 
-## Second: photographs go through a transform
+## Second: the bundle decides how a photograph is fetched
 
 This is the one that fails silently, so it comes second only because the build
 contract has to come first.
 
-`Photograph.url` and `site.mediaBase` resolve an object key against
+`Photograph.url`, and `mediaBase` on the bundle, resolve an object key against
 `media.cafa-studio.com`, which serves R2 originals — full-size, straight off the
-bucket. **Do not point an `<img src>` at one.** Every photograph on the site is
-served through Cloudflare's image transformations:
+bucket. Whether an `<img src>` may point at one is not your decision and not a
+constant. It is one boolean, published alongside the origin:
+
+```json
+{ "mediaBase": "https://media.cafa-studio.com", "mediaTransform": true }
+```
+
+**`mediaTransform: true`** — the arrangement this site is designed around. Every
+photograph goes through Cloudflare's image transformations, and pointing an
+`<img src>` straight at an original is a bug:
 
 ```
 /cdn-cgi/image/<options>/<absolute source url>
 ```
 
-Two things about this are load-bearing:
+**`mediaTransform: false`** — the zone cannot transform, so `/cdn-cgi/image/`
+answers with something that is not an image. Render `<mediaBase>/<key>` as it
+is. The photographs are the ≤2400px versions the editor downscales to on
+upload, so this is a page that costs more bytes, not a page that is broken.
+
+Read the field. Hard-coding either branch means the site breaks on the day the
+zone's plan changes, in the direction that is hardest to notice.
+
+Three things about this are load-bearing:
 
 - **`/cdn-cgi/image/` runs on the zone serving the page**, not on the media
   origin. The path is relative to the site's own hostname; the source URL inside
   it is absolute. `media.cafa-studio.com` is a subdomain of the same zone
   specifically so this costs no second TLS handshake on the LCP path.
-- **Image Transformations must be enabled on the zone** (Images →
-  Transformations). With it off, the site builds, deploys, and renders with
-  every image broken — no layer in between reports anything. `npm run media` in
-  CAFA-Admin is what detects it: it fetches a published photograph through the
-  transformation and reports which link in the chain is down.
+- **Image Transformations are a paid-plan zone setting** (Images →
+  Transformations). That is why the flag exists: on a Free zone the setting
+  reads back as not editable, and no token or API call turns it on. `MEDIA_TRANSFORM`
+  in CAFA-Admin's `wrangler.jsonc` is where the answer is set, and it reaches
+  the site only through a redeploy *and* a publish — the bundle is a snapshot,
+  so a var changed after the last publish is not yet in the revision you read.
+- **Nothing downstream notices a mismatch.** With the flag on and the zone off,
+  the site builds, deploys and renders with every image broken, and no layer in
+  between reports anything. `npm run media` in CAFA-Admin is what detects it: it
+  fetches a real published photograph the way a browser would — through the
+  transformation, or not, according to the flag the deployed admin publishes —
+  and names whichever link is down.
 
 Every photograph arrives with `width` and `height` measured from the file at
 upload rather than taken from the client, so they can be trusted as an aspect

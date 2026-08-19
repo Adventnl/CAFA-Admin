@@ -61,6 +61,8 @@ export interface ReadableBundle {
   dictionaries: Record<string, unknown>;
   media: Record<string, { width: number; height: number }>;
   mediaBase: string;
+  /** False on a zone that cannot transform: render the originals as they are. */
+  mediaTransform: boolean;
 }
 
 /** The newest revision, parsed once per request. */

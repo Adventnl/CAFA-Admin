@@ -74,9 +74,11 @@ Every successful answer has the same two fields:
 checked against \`/api/v1/revision\` with one small request rather than a refetch.
 
 Photographs are not served through this API. Content refers to a photograph by
-its object key, and \`site.mediaBase\` — or the \`url\` on each entry of
-\`/api/v1/photographs\` — resolves that key against the media origin, so an
-\`<img src>\` reaches the CDN directly.
+its object key, and \`mediaBase\` on the bundle — or the \`url\` on each entry
+of \`/api/v1/photographs\` — resolves that key against the media origin, so an
+\`<img src>\` reaches the CDN directly. \`mediaTransform\` on the bundle says
+whether those URLs may go through \`/cdn-cgi/image/…\` first; when it is false
+the zone cannot transform and the originals are what the site renders.
 
 Any origin may read these endpoints. They carry only what is already public.`;
 

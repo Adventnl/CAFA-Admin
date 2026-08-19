@@ -2,7 +2,10 @@
   // One Worker serves both halves of the admin: the built SPA as static assets,
   // and the /api and /auth routes that hold the session and the only writable
   // handle on the content.
-  "name": "cafa-admin",
+  // Matches the Worker that already holds admin.cafa-studio.com. Renaming this
+  // would deploy a second, empty Worker and leave the custom domain behind on
+  // the first, so it stays as the account has it.
+  "name": "cafa-admin-test",
   "main": "worker/index.ts",
   "compatibility_date": "2026-08-05",
   "compatibility_flags": ["nodejs_compat"],
@@ -23,15 +26,13 @@
     "not_found_handling": "single-page-application"
   },
 
-  // The content. Create it once with:
-  //   npx wrangler d1 create cafa-content
-  // then paste the id it prints in here, and apply the schema with:
-  //   npx wrangler d1 migrations apply cafa-content --remote
+  // The content. Created with `npx wrangler d1 create cafa-content`; the schema
+  // is applied with `npx wrangler d1 migrations apply cafa-content --remote`.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "cafa-content",
-      "database_id": "REPLACE_WITH_THE_ID_WRANGLER_PRINTS",
+      "database_id": "44aa3c10-ae35-4840-9fcc-287be6e8c9e7",
       "migrations_dir": "migrations"
     }
   ],
@@ -56,6 +57,25 @@
     // the zone the *page* is served from, and keeping the origin inside that
     // same zone means no second TLS handshake on the LCP path.
     "MEDIA_BASE": "https://media.cafa-studio.com",
+
+    // Whether the site may ask for those photographs through /cdn-cgi/image/.
+    //
+    // Image Transformations are a zone setting on a paid plan. On a Free zone
+    // the API reports the setting as readable and not editable — no token and
+    // no --fix turns it on — and every /cdn-cgi/image/ URL the site builds
+    // answers with something that is not an image. Which is a broken site.
+    //
+    // So this says off, and the published bundle carries it as
+    // `mediaTransform: false`, which tells the template to point <img> at the
+    // originals in MEDIA_BASE instead. Photographs load; they are the 2400px
+    // versions the browser already downscales on upload, so it costs bytes and
+    // not correctness.
+    //
+    // Delete this line — or say "on" — once cafa-studio.com is on Pro and
+    // Images → Transformations is enabled, then redeploy and republish. Absent
+    // means on. `npm run media` checks this line against the actual zone and
+    // complains whichever way the two disagree.
+    "MEDIA_TRANSFORM": "off",
 
     // The public site's origin, and now the only place that says where it is.
     //

@@ -258,7 +258,7 @@ export const COMPONENTS: Record<string, JsonSchema> = {
   Photograph: shape(
     {
       key: text('The object key, which is what content refers to a photograph by.'),
-      url: text('The absolute URL of the original. Point an `<img src>` at it, or transform it.'),
+      url: text('The absolute URL of the original. Transform it when `Bundle.mediaTransform` is true; otherwise point an `<img src>` straight at it.'),
       width: whole('The intrinsic width in pixels, measured from the file on upload.'),
       height: whole('The intrinsic height, likewise. Together they are the aspect box.'),
       alt: {
@@ -286,6 +286,9 @@ export const COMPONENTS: Record<string, JsonSchema> = {
         'Dimensions by object key, for every photograph public content cites.',
       ),
       mediaBase: text('The origin the photographs are served from.'),
+      mediaTransform: flag(
+        'Whether photographs may be requested through `/cdn-cgi/image/…` on the site’s own zone. False means the zone cannot transform and the originals must be rendered as they are — the URLs in `mediaBase` still resolve, they are simply full size.',
+      ),
     },
     'The whole published revision in one answer — the same projection the site’s own build reads.',
   ),

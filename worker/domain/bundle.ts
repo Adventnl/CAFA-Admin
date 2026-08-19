@@ -79,6 +79,12 @@ export interface PublishedBundle {
   media: Record<string, { width: number; height: number }>;
   /** Where the originals live, so the template can build transform URLs. */
   mediaBase: string;
+  /**
+   * Whether those URLs may go through `/cdn-cgi/image/`. False is not a
+   * preference — it is a zone that cannot transform, and it tells the site to
+   * point at the originals rather than at a path that answers 404.
+   */
+  mediaTransform: boolean;
 }
 
 /** A dictionary minus the chrome keys, which belong to `site` instead. */
@@ -123,11 +129,31 @@ function project(work: Work): unknown {
   };
 }
 
+/**
+ * `MEDIA_TRANSFORM`, as a decision rather than a string.
+ *
+ * Image Transformations are a zone setting, and on a Free zone it is readable
+ * and not writable — no token and no API call turns it on. The site cannot see
+ * the zone, so this is how it is told: absent means the documented setup, where
+ * the zone transforms; the word `off` means it does not, and every photograph
+ * should be requested straight from `mediaBase`.
+ *
+ * The asymmetry is deliberate. Only a value that plainly says off turns it off,
+ * so a typo cannot quietly drop the whole site onto full-size originals — and
+ * the opposite mistake, a var that says on for a zone that is not, is exactly
+ * what `npm run media` fetches a real photograph to catch.
+ */
+export function transformsOn(value: string | undefined): boolean {
+  const said = (value ?? '').trim().toLowerCase();
+  return said !== 'off' && said !== 'false' && said !== '0';
+}
+
 export function buildBundle(
   content: ContentSet,
   media: MediaRow[],
   mediaBase: string,
   siteUrl: string,
+  mediaTransform: string | undefined,
 ): PublishedBundle {
   const works = content.works.map(project);
 
@@ -171,5 +197,6 @@ export function buildBundle(
     dictionaries: { zh: pageCopy(content.zh), en: pageCopy(content.en) },
     media: dimensions,
     mediaBase,
+    mediaTransform: transformsOn(mediaTransform),
   };
 }
