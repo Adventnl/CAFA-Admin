@@ -228,6 +228,11 @@ export CLOUDFLARE_ACCOUNT_ID=…   # + Zone Settings:Edit, R2:Edit, DNS:Edit to 
 npm run media -- --fix
 ```
 
+`CLOUDFLARE_ACCOUNT_ID` is the account **this Worker is deployed in** — the one
+in its dashboard URL. Bindings and zones are account-local, so a bucket created
+in a second account is invisible to the Worker and to this check alike, and the
+symptom is indistinguishable from never having created it.
+
 ### 3. The content
 
 The content is a one-shot import from the JSON the template used to carry and

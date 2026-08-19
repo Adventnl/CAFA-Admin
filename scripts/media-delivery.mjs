@@ -503,8 +503,12 @@ async function main() {
       'zone',
       config.mediaHost,
       'no zone in this account covers it',
-      `No zone in account ${ACCOUNT} covers ${config.mediaHost}. Nothing else can work\n` +
-        `until the domain is a zone here and its nameservers point at Cloudflare.`,
+      `No zone in account ${ACCOUNT} covers ${config.mediaHost}. Two things look like\n` +
+        `this. Either the domain is not a Cloudflare zone yet, and nothing else can work\n` +
+        `until it is and its nameservers point there — or CLOUDFLARE_ACCOUNT_ID names a\n` +
+        `different account from the one the Worker is deployed in, which is easy to do\n` +
+        `with more than one account and looks identical from here. The account in the\n` +
+        `Worker's own dashboard URL is the one that matters.`,
     );
     print(false);
     process.exit(1);
