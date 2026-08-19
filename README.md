@@ -142,6 +142,38 @@ deploy hooks are wired.
 [docs/Frontend.md](docs/Frontend.md) is those four things. Hand it over with
 `api.json`.
 
+## Checking that photographs load
+
+Nothing in either repository serves an image. The site's HTML carries one URL
+per photograph:
+
+```
+/cdn-cgi/image/<options>/https://media.cafa-studio.com/works/<slug>/01.jpg
+```
+
+and that URL resolves only if four things are true in the Cloudflare account —
+the zone is active, the bucket exists, `MEDIA_BASE`'s hostname is an R2 custom
+domain on it, and Image Transformations are enabled on the zone. **The middle
+two fail silently.** Content publishes, the build fetches it, `next build`
+writes correct HTML, the deploy goes green, and every photograph on the live
+site is a broken image. There is no error anywhere to read.
+
+```sh
+npm run media           # report
+npm run media -- --fix  # repair what the API can repair, then report
+```
+
+It reads the bucket, `MEDIA_BASE` and `PRODUCTION_URL` out of `wrangler.jsonc`,
+so it is checking the deployment rather than a second copy of its hostnames.
+The last two checks are the ones worth having: it takes a real object key from
+what the admin has actually published and fetches it twice, once from the media
+origin and once through the transformation — which is what a browser does on the
+live site, so passing is the site working rather than a proxy for it. It reads
+the *deployed* Worker's `mediaBase` rather than this checkout's, so a var edited
+and never deployed shows up as the mismatch it is.
+
+Exit code is 0 only when every link holds, so a deploy can gate on it.
+
 ## Setting it up
 
 From nothing: a registered domain and these two repositories. The order below is
@@ -166,7 +198,8 @@ and add a **redirect rule** sending `www.cafa-studio.com` to the apex, 301.
 
 Transformations are the one that fails invisibly. Every photograph on the site
 is served through `/cdn-cgi/image/…`, so with it off the site builds, deploys
-and renders with every image broken.
+and renders with every image broken. `npm run media` is the check that catches
+it — see [Checking that photographs load](#checking-that-photographs-load).
 
 ### 2. The database and the bucket
 
@@ -184,6 +217,16 @@ Then connect **`media.cafa-studio.com`** to the bucket in its R2 settings, so it
 matches `MEDIA_BASE` in `wrangler.jsonc`. A subdomain of the site's own zone on
 purpose: `/cdn-cgi/image/` runs on the zone serving the page, so an origin
 inside that same zone costs no second TLS handshake on the LCP path.
+
+That click and the transformations toggle above are the two steps in this
+runbook that nothing downstream complains about when they are skipped, so both
+can be done — and checked — with one command instead:
+
+```sh
+export CLOUDFLARE_API_TOKEN=…    # Zone:Read + Workers R2 Storage:Read to look
+export CLOUDFLARE_ACCOUNT_ID=…   # + Zone Settings:Edit, R2:Edit, DNS:Edit to fix
+npm run media -- --fix
+```
 
 ### 3. The content
 

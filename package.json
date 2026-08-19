@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "deploy": "npm run build && wrangler deploy",
     "set-password": "node scripts/set-password.mjs",
+    "media": "node scripts/media-delivery.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
