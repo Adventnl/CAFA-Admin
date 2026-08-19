@@ -61,7 +61,9 @@ Two things about this are load-bearing:
   specifically so this costs no second TLS handshake on the LCP path.
 - **Image Transformations must be enabled on the zone** (Images →
   Transformations). With it off, the site builds, deploys, and renders with
-  every image broken. Nothing in this repository can detect that.
+  every image broken — no layer in between reports anything. `npm run media` in
+  CAFA-Admin is what detects it: it fetches a published photograph through the
+  transformation and reports which link in the chain is down.
 
 Every photograph arrives with `width` and `height` measured from the file at
 upload rather than taken from the client, so they can be trusted as an aspect
