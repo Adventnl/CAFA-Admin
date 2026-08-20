@@ -21,7 +21,7 @@ import type { Connector, ConnectorGroup, ReadableBundle } from './connector';
 import { list, ref, shape, text, whole } from './schema';
 
 /** Bumped when a connector's answer changes shape in a way a client would feel. */
-export const API_VERSION = '1.0.0';
+export const API_VERSION = '1.1.0';
 
 /** Where the compiled document is served. */
 export const DOCUMENT_PATH = '/api.json';
@@ -50,7 +50,7 @@ export const GROUPS: readonly ConnectorGroup[] = [
   {
     name: 'Photographs',
     description:
-      'Where the pictures are and how big they are. The bytes are served from the media origin rather than through this API, so an `<img src>` points straight at the CDN and nothing is proxied.',
+      'Where the pictures are, how big they are and what colour they are. The bytes are served from the media origin rather than through this API, so an `<img src>` points straight at the CDN and nothing is proxied.',
   },
   {
     name: 'Everything',
@@ -241,7 +241,7 @@ export const CONNECTORS: readonly Connector[] = [
     path: '/api/v1/photographs',
     summary: 'Every published photograph',
     description:
-      'One flat list of everything the published content cites — the works’ covers and pages, the mentors’ portraits, the studio — each with an absolute URL, its intrinsic dimensions and its alt text. A private work’s photographs are absent, because a published revision does not name them. The dimensions are measured from the file at upload rather than taken from the client, so they can be trusted as an aspect box.',
+      'One flat list of everything the published content cites — the works’ covers and pages, the mentors’ portraits, the studio — each with an absolute URL, its intrinsic dimensions, its dominant hue and its alt text. A private work’s photographs are absent, because a published revision does not name them. The dimensions are measured from the file at upload rather than taken from the client, so they can be trusted as an aspect box.',
     params: [
       {
         name: 'prefix',
@@ -278,6 +278,7 @@ interface Photograph {
   url: string;
   width: number;
   height: number;
+  tint: number | null;
   alt: ImageRef['alt'];
   decorative: boolean;
   usedBy: string;
@@ -287,10 +288,10 @@ interface Photograph {
  * The photographs, from the two halves that each know part of the answer.
  *
  * The content knows what an image is *of* and what cites it; the media map
- * knows how big it is. Only keys in the media map are returned, and that is the
- * privacy guarantee doing its work rather than a filter of our own — bundle.ts
- * puts a photograph's dimensions there only when public content cites it, so a
- * private work's pictures cannot appear here even by accident.
+ * knows how big it is and what colour it is. Only keys in that map are returned,
+ * and that is the privacy guarantee doing its work rather than a filter of our
+ * own — bundle.ts measures a photograph into it only when public content cites
+ * it, so a private work's pictures cannot appear here even by accident.
  */
 function photographsOf(bundle: ReadableBundle): Photograph[] {
   const base = bundle.mediaBase.replace(/\/$/, '');
@@ -298,15 +299,16 @@ function photographsOf(bundle: ReadableBundle): Photograph[] {
   const seen = new Set<string>();
 
   function add(image: ImageRef, usedBy: string): void {
-    const size = bundle.media[image.src];
-    if (image.src === '' || size === undefined || seen.has(image.src)) return;
+    const measured = bundle.media[image.src];
+    if (image.src === '' || measured === undefined || seen.has(image.src)) return;
     seen.add(image.src);
 
     photographs.push({
       key: image.src,
       url: `${base}/${image.src}`,
-      width: size.width,
-      height: size.height,
+      width: measured.width,
+      height: measured.height,
+      tint: measured.tint,
       alt: image.alt,
       decorative: image.alt === '',
       usedBy,

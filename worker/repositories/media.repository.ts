@@ -8,13 +8,15 @@
  *
  * `width` and `height` are what the template turns into the aspect box that
  * holds a slot open before an image loads, so they are the numbers the site's
- * CLS budget rests on.
+ * CLS budget rests on. `tint` is the softer one beside them: the dominant hue
+ * the works index draws its band from, null where a photograph has none and
+ * where one predates the column.
  */
 import type { MediaRow } from '../models/rows';
 
 export async function readMedia(db: D1Database): Promise<MediaRow[]> {
   const rows = await db
-    .prepare('SELECT key, width, height, bytes FROM media ORDER BY key')
+    .prepare('SELECT key, width, height, bytes, tint FROM media ORDER BY key')
     .all<MediaRow>();
   return rows.results;
 }
@@ -26,11 +28,12 @@ export async function readMedia(db: D1Database): Promise<MediaRow[]> {
 export async function recordMedia(db: D1Database, row: MediaRow): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO media (key, width, height, bytes) VALUES (?, ?, ?, ?)
+      `INSERT INTO media (key, width, height, bytes, tint) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (key) DO UPDATE SET width  = excluded.width,
                                        height = excluded.height,
-                                       bytes  = excluded.bytes`,
+                                       bytes  = excluded.bytes,
+                                       tint   = excluded.tint`,
     )
-    .bind(row.key, row.width, row.height, row.bytes)
+    .bind(row.key, row.width, row.height, row.bytes, row.tint)
     .run();
 }

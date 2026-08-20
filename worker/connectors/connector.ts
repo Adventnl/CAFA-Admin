@@ -59,7 +59,7 @@ export interface ReadableBundle {
   programs: Program[];
   mentors: Mentor[];
   dictionaries: Record<string, unknown>;
-  media: Record<string, { width: number; height: number }>;
+  media: Record<string, { width: number; height: number; tint: number | null }>;
   mediaBase: string;
   /** False on a zone that cannot transform: render the originals as they are. */
   mediaTransform: boolean;

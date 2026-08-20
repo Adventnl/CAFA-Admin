@@ -18,7 +18,7 @@
 import { NAV_PANELS, NAV_ROUTES } from '../domain/bundle';
 
 export interface JsonSchema {
-  type?: 'object' | 'array' | 'string' | 'integer' | 'number' | 'boolean';
+  type?: 'object' | 'array' | 'string' | 'integer' | 'number' | 'boolean' | 'null';
   description?: string;
   properties?: Record<string, JsonSchema>;
   required?: readonly string[];
@@ -45,6 +45,18 @@ export function whole(description: string): JsonSchema {
 
 export function flag(description: string): JsonSchema {
   return { type: 'boolean', description };
+}
+
+/**
+ * A number, or null where there is nothing to measure.
+ *
+ * Written as an `anyOf` rather than a nullable number because the document is
+ * OpenAPI 3.1, which is JSON Schema — `null` is a type there, and `nullable:`
+ * is the 3.0 spelling that no longer exists. One shape uses it: a photograph's
+ * hue, which a monochrome image genuinely does not have.
+ */
+export function maybeNumber(description: string): JsonSchema {
+  return { anyOf: [{ type: 'number' }, { type: 'null' }], description };
 }
 
 export function choice(values: readonly string[], description: string): JsonSchema {
@@ -206,7 +218,7 @@ export const COMPONENTS: Record<string, JsonSchema> = {
         workPager: 'The label on the previous/next pager.',
         close: 'The label on a close button.',
       }),
-      home: words({ statement: 'The statement on the front page.', worksLink: 'Its one link.' }),
+      home: words({ statement: 'The statement on the front page.' }),
       works: shape({
         title: text('The works page heading.'),
         description: text('Its meta description.'),
@@ -234,8 +246,8 @@ export const COMPONENTS: Record<string, JsonSchema> = {
         title: text('The about page heading.'),
         description: text('Its meta description.'),
         body: list(text('One paragraph.'), 'The about text, one entry per paragraph.'),
-        studioTitle: text('The heading above the studio photographs.'),
         mentorsTitle: text('The heading above the mentors.'),
+        worksTitle: text('The heading above the works.'),
       }),
       contact: words({
         title: 'The heading of the contact panel.',
@@ -244,6 +256,10 @@ export const COMPONENTS: Record<string, JsonSchema> = {
         address: 'The label before the address.',
         hours: 'The label before the opening hours.',
         note: 'The line under them.',
+        from: 'The label on the message form’s address field.',
+        message: 'The label on its message field.',
+        subject: 'The subject line the reader’s own mail client opens with.',
+        send: 'The word on its button.',
       }),
       notFound: words({
         title: 'The 404 heading.',
@@ -261,6 +277,9 @@ export const COMPONENTS: Record<string, JsonSchema> = {
       url: text('The absolute URL of the original. Transform it when `Bundle.mediaTransform` is true; otherwise point an `<img src>` straight at it.'),
       width: whole('The intrinsic width in pixels, measured from the file on upload.'),
       height: whole('The intrinsic height, likewise. Together they are the aspect box.'),
+      tint: maybeNumber(
+        'The dominant hue in degrees on the OKLCH colour circle, [0, 360). Null when the photograph has no hue to give — it is monochrome, or it predates the measurement.',
+      ),
       alt: {
         anyOf: [ref('LocalisedText'), { type: 'string', const: '' }],
         description: 'The description in both languages, or the empty string when decorative.',
@@ -282,8 +301,12 @@ export const COMPONENTS: Record<string, JsonSchema> = {
         'The site’s words, one dictionary per language.',
       ),
       media: map(
-        shape({ width: whole('Intrinsic width.'), height: whole('Intrinsic height.') }),
-        'Dimensions by object key, for every photograph public content cites.',
+        shape({
+          width: whole('Intrinsic width.'),
+          height: whole('Intrinsic height.'),
+          tint: maybeNumber('Dominant hue in OKLCH degrees, or null where there is none.'),
+        }),
+        'What was measured, by object key, for every photograph public content cites.',
       ),
       mediaBase: text('The origin the photographs are served from.'),
       mediaTransform: flag(

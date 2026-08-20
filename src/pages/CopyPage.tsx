@@ -37,11 +37,6 @@ const GROUPS: CopyGroup[] = [
         read: (d) => d.home.statement,
         write: (d, v) => ({ ...d, home: { ...d.home, statement: v } }),
       },
-      {
-        label: 'Link to works',
-        read: (d) => d.home.worksLink,
-        write: (d, v) => ({ ...d, home: { ...d.home, worksLink: v } }),
-      },
     ],
   },
   {
@@ -59,14 +54,14 @@ const GROUPS: CopyGroup[] = [
         write: (d, v) => ({ ...d, about: { ...d.about, description: v } }),
       },
       {
-        label: 'Heading above the studio photographs',
-        read: (d) => d.about.studioTitle,
-        write: (d, v) => ({ ...d, about: { ...d.about, studioTitle: v } }),
-      },
-      {
         label: 'Heading above the mentors',
         read: (d) => d.about.mentorsTitle,
         write: (d, v) => ({ ...d, about: { ...d.about, mentorsTitle: v } }),
+      },
+      {
+        label: 'Heading above the works',
+        read: (d) => d.about.worksTitle,
+        write: (d, v) => ({ ...d, about: { ...d.about, worksTitle: v } }),
       },
     ],
   },
@@ -201,6 +196,27 @@ const GROUPS: CopyGroup[] = [
         hint: 'How to apply, and what happens next.',
         read: (d) => d.contact.note,
         write: (d, v) => ({ ...d, contact: { ...d.contact, note: v } }),
+      },
+      {
+        label: 'Message form — the address field',
+        read: (d) => d.contact.from,
+        write: (d, v) => ({ ...d, contact: { ...d.contact, from: v } }),
+      },
+      {
+        label: 'Message form — the message field',
+        read: (d) => d.contact.message,
+        write: (d, v) => ({ ...d, contact: { ...d.contact, message: v } }),
+      },
+      {
+        label: 'Message form — subject line',
+        hint: 'The line the reader’s own mail client opens with. Send hands them a draft; nothing is collected here.',
+        read: (d) => d.contact.subject,
+        write: (d, v) => ({ ...d, contact: { ...d.contact, subject: v } }),
+      },
+      {
+        label: 'Message form — the send button',
+        read: (d) => d.contact.send,
+        write: (d, v) => ({ ...d, contact: { ...d.contact, send: v } }),
       },
     ],
   },

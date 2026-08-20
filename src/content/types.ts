@@ -38,6 +38,13 @@ export interface MediaInfo {
   width: number;
   height: number;
   bytes: number;
+  /**
+   * The dominant hue, in degrees on the OKLCH colour circle, or null where the
+   * photograph has none — it is monochrome, or it was uploaded before the admin
+   * measured such things. The template draws the works index's hover band from
+   * it and falls back to a neutral one when it is null.
+   */
+  tint: number | null;
 }
 
 export type WorkStatus = 'completed' | 'in-progress' | 'private';
@@ -113,7 +120,7 @@ export interface Dictionary {
     workPager: string;
     close: string;
   };
-  home: { statement: string; worksLink: string };
+  home: { statement: string };
   works: { title: string; description: string; status: Record<WorkStatus, string> };
   work: {
     index: string;
@@ -129,8 +136,8 @@ export interface Dictionary {
     title: string;
     description: string;
     body: string[];
-    studioTitle: string;
     mentorsTitle: string;
+    worksTitle: string;
   };
   contact: {
     title: string;
@@ -139,6 +146,12 @@ export interface Dictionary {
     address: string;
     hours: string;
     note: string;
+    /** The message form: two field labels, the subject the reader's mail client
+        opens with, and the word on the button. */
+    from: string;
+    message: string;
+    subject: string;
+    send: string;
   };
   notFound: { title: string; body: string; home: string };
   footer: { note: string };
