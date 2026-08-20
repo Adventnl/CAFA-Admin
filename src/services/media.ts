@@ -8,12 +8,19 @@
  */
 import { request } from './http';
 import type { MediaInfo } from '../content/types';
+import type { PreparedImage } from '../images';
 
 export const mediaService = {
-  upload: (key: string, image: Blob) =>
+  /**
+   * The bytes are the body; the key and the measured hue ride in the query,
+   * because there is nowhere else for them to sit. A hue of null is simply left
+   * out — the Worker reads an absent one as "no hue to give", which is the same
+   * thing a monochrome photograph has.
+   */
+  upload: (key: string, { image, tint }: PreparedImage) =>
     request<MediaInfo>('/api/media', {
       method: 'POST',
-      query: { key },
+      query: { key, tint: tint ?? undefined },
       headers: { 'Content-Type': image.type },
       raw: image,
     }),

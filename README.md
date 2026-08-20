@@ -50,6 +50,13 @@ schema, rather than discovered at build time:
   re-encoded — which also drops the EXIF block and the GPS coordinates in it.
   Their dimensions are then measured again in the Worker, from the bytes,
   because they become the aspect box the site's CLS budget rests on.
+- **And measured for colour on the way past.** The browser has just decoded the
+  photograph to resize it, so it reads the dominant hue out of it in the same
+  pass — an OKLCH angle, which is what the site's works index draws the band
+  behind a hovered row from. That one number comes from the client rather than
+  from the bytes, because a Worker has no decoder; the Worker checks it is an
+  angle and the column checks again. A photograph with no hue to give, and one
+  uploaded before this existed, both record nothing and get a neutral band.
 - **A private work publishes nothing.** It is listed in the index and has no
   page; its cover and photographs are dropped when a revision is built, so no
   URL for them ever reaches a browser.
@@ -88,7 +95,7 @@ GET /api/v1/works/{slug}
 GET /api/v1/programs          GET /api/v1/programs/{slug}
 GET /api/v1/mentors           GET /api/v1/mentors/{slug}
 GET /api/v1/copy/{locale}     every fixed word on the site, in one language
-GET /api/v1/photographs       ?prefix=works/ — URLs, dimensions and alt text
+GET /api/v1/photographs       ?prefix=works/ — URLs, dimensions, hue, alt text
 GET /api/v1/bundle            all of the above in one answer, ~40 KB
 GET /api.json                 the OpenAPI 3.1 document, compiled from the above
 ```
@@ -405,6 +412,24 @@ npm run lint
 Local development needs a `.dev.vars` file with the secrets above. It is
 gitignored; do not commit it.
 
+### Deploying a change to a database that already exists
+
+```sh
+npx wrangler d1 migrations apply cafa-content --remote
+npm run deploy
+```
+
+**In that order, and close together.** Every migration here has been one the
+Worker deployed after it depends on, and the gap between the two commands is the
+only window in which the two disagree — a save landing in it would write nine
+values into an eight-column table, or drop copy keys the new editor has and the
+old one does not. It is a one-person admin and the window is a deploy, so this
+costs nothing to get right.
+
+Then open the admin and press **Publish** once. A migration changes what a
+published revision would contain; until something is published, the live site is
+still being built from the revision before it.
+
 ## Layout
 
 The Worker is layered the way `veyra_api` is, because the same shape solves the
@@ -416,8 +441,12 @@ of a `Request`.
 ```
 migrations/
   0001_initial.sql          the schema, and the constraints that are really rules
+  0002_…url_is_…config.sql  the site's origin stops being content
+  0003_template_copy_sync…  the copy keys follow the template's Dictionary
+  0004_media_tint.sql       a photograph's dominant hue, beside its dimensions
 scripts/
   import.mjs                the one-shot move from files to database
+  media-delivery.mjs        does the zone transform, and does the bucket answer
   set-password.mjs          a password in, the ADMIN_PASSWORD_HASH line out
 
 worker/
@@ -517,3 +546,19 @@ describe what the admin can actually change. `worker/domain/bundle.ts` reconcile
 two when it builds a revision. The copy cannot drift dangerously: the template
 re-parses every field at build time, so a mismatch fails the build and never
 reaches the live site.
+
+Which is also how the two are kept in step, and it is worth writing down because
+it is the one maintenance job this repository has. When the template changes
+what it reads — a heading that moved to another page, a form that grew four
+labels — the sequence is always the same four edits:
+
+1. `src/content/types.ts`, so `Dictionary` says what the template's says.
+2. `src/pages/CopyPage.tsx`, so the studio can reach the new field.
+3. A migration, because copy keys are schema: the old ones are deleted and the
+   new ones inserted with a default, since the template refuses to build on a
+   blank.
+4. `worker/connectors/schema.ts`, so `api.json` describes what it now answers.
+
+Miss the first and the compiler says so. Miss the third and the site's next
+build fails with the path to the missing key, which is the failure you want —
+loud, before anything is served, with the previous deploy still up.

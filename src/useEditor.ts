@@ -29,7 +29,7 @@ export interface Editor {
   uploading: boolean;
   error: string | null;
   update: <K extends keyof ContentSet>(key: K, value: ContentSet[K]) => void;
-  /** Resize, upload and register a photograph. Resolves when it is in the bucket. */
+  /** Resize, measure, upload and register a photograph. Resolves once it is in the bucket. */
   putMedia: (key: string, file: File) => Promise<void>;
   /** A URL the editor can show a committed photograph at. */
   mediaUrl: (key: string) => string;

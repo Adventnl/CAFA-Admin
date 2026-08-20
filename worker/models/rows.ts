@@ -103,6 +103,8 @@ export interface MediaRow {
   width: number;
   height: number;
   bytes: number;
+  /** The dominant hue in OKLCH degrees, or null where there is none to have. */
+  tint: number | null;
 }
 
 export interface RevisionRow {

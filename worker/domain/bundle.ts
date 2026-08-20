@@ -75,8 +75,15 @@ export interface PublishedBundle {
   programs: unknown;
   mentors: unknown;
   dictionaries: { zh: unknown; en: unknown };
-  /** Intrinsic dimensions, for the aspect box. Only what public content cites. */
-  media: Record<string, { width: number; height: number }>;
+  /**
+   * What was measured about each photograph the published content cites, and
+   * nothing about the ones it does not: the intrinsic size the template holds
+   * an aspect box open with, and the dominant hue it draws the works index's
+   * hover band from. `tint` is null for a monochrome photograph and for one
+   * uploaded before the admin measured such things; the site reads both as no
+   * hue and uses its neutral band.
+   */
+  media: Record<string, { width: number; height: number; tint: number | null }>;
   /** Where the originals live, so the template can build transform URLs. */
   mediaBase: string;
   /**
@@ -159,7 +166,7 @@ export function buildBundle(
 
   // Only the photographs public content actually cites. A private work's
   // originals are in the bucket and in the media table; they are not in here,
-  // so nothing published names them.
+  // so nothing published names them — not their size, not their colour.
   const cited = new Set<string>();
   for (const work of content.works) {
     if (work.status === 'private') continue;
@@ -169,9 +176,11 @@ export function buildBundle(
   for (const mentor of content.mentors) cited.add(mentor.portrait.src);
   for (const image of content.site.studio) cited.add(image.src);
 
-  const dimensions: Record<string, { width: number; height: number }> = {};
+  const measured: PublishedBundle['media'] = {};
   for (const row of media) {
-    if (cited.has(row.key)) dimensions[row.key] = { width: row.width, height: row.height };
+    if (cited.has(row.key)) {
+      measured[row.key] = { width: row.width, height: row.height, tint: row.tint };
+    }
   }
 
   const zhChrome = chromeOf(content.zh);
@@ -195,7 +204,7 @@ export function buildBundle(
     programs: content.programs,
     mentors: content.mentors,
     dictionaries: { zh: pageCopy(content.zh), en: pageCopy(content.en) },
-    media: dimensions,
+    media: measured,
     mediaBase,
     mediaTransform: transformsOn(mediaTransform),
   };

@@ -1,0 +1,31 @@
+-- A photograph's dominant hue, recorded beside its dimensions.
+--
+-- The template's works index dims every row but the one under the pointer and
+-- draws a band behind that row: `oklch(--tint-l --tint-c H)`, where H is the
+-- dominant hue of that work's cover. `--tint-l` and `--tint-c` are fixed tokens
+-- — the band is a constant lightness and chroma so the type over it clears
+-- 4.5:1 whatever photograph arrives — so the only thing the site needs from us
+-- is H, and `lib/content-schema.ts` reads it off `media[key].tint`.
+--
+-- REAL and nullable, and both halves are the contract rather than laxity:
+--
+--   * REAL because it is an angle on the OKLCH colour circle, in degrees, and
+--     rounding 214.7° to 215° is a different colour for no reason. The CHECK is
+--     the range the template refuses to build outside of.
+--   * NULL because "no hue" is a real answer. A monochrome photograph has none,
+--     and neither has one uploaded before this column existed. The template
+--     reads both as null and gives them `--c-tint-none`, the same band at the
+--     paper's own warmth, so an unmeasured photograph is a neutral row rather
+--     than a broken one. Existing rows stay NULL; a photograph is measured when
+--     it is next uploaded.
+--
+-- Where it is measured is worker/services/media.service.ts, and the short
+-- version is that a Worker cannot: there is no decoder in it, and no sharp. The
+-- browser has the pixels open already — src/images.ts resizes every photograph
+-- before it is sent — so it measures the hue in the same pass, and the Worker
+-- checks the number is an angle before it stores it. That is the opposite of
+-- how width and height are handled, on purpose: a wrong dimension is layout
+-- shift on the live site, and a wrong hue is a slightly wrong ground behind one
+-- row for as long as a pointer rests on it.
+
+ALTER TABLE media ADD COLUMN tint REAL CHECK (tint IS NULL OR (tint >= 0 AND tint < 360));
