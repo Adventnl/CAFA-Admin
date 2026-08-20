@@ -9,6 +9,7 @@
  */
 import type { Dictionary, Locale } from '../content/types';
 import { LOCALES } from '../content/types';
+import { useTranslation } from 'react-i18next';
 import type { Editor } from '../useEditor';
 import { moved, Repeatable, TextField } from '../ui/fields';
 
@@ -319,25 +320,27 @@ interface CopyPageProps {
 }
 
 export function CopyPage({ editor }: CopyPageProps) {
+  const { t } = useTranslation(['translation', 'copy']);
+  const copy = (value: string) => t(value, { ns: 'copy', keySeparator: false });
   const set = (locale: Locale, next: Dictionary) => editor.update(locale, next);
 
   return (
     <section>
       <header className="section-head">
-        <h2>Site text</h2>
+        <h2>{t('pages.siteText')}</h2>
       </header>
       <p className="section-note">
-        Every one of these exists in both languages. A blank in either is caught before saving.
+        {t('copyPage.intro')}
       </p>
 
       {GROUPS.map((group) => (
         <section key={group.title} className="copy-group">
-          <h3 className="copy-group-title">{group.title}</h3>
-          {group.note !== undefined && <p className="section-note">{group.note}</p>}
+          <h3 className="copy-group-title">{copy(group.title)}</h3>
+          {group.note !== undefined && <p className="section-note">{copy(group.note)}</p>}
 
           {group.fields.map((field) => (
             <fieldset key={field.label} className="field localised">
-              <legend className="field-label">{field.label}</legend>
+              <legend className="field-label">{copy(field.label)}</legend>
               <div className="localised-pair">
                 {LOCALES.map((locale) => (
                   <TextField
@@ -349,16 +352,16 @@ export function CopyPage({ editor }: CopyPageProps) {
                   />
                 ))}
               </div>
-              {field.hint !== undefined && <p className="field-hint">{field.hint}</p>}
+              {field.hint !== undefined && <p className="field-hint">{copy(field.hint)}</p>}
             </fieldset>
           ))}
         </section>
       ))}
 
       <section className="copy-group">
-        <h3 className="copy-group-title">About — the paragraphs</h3>
+        <h3 className="copy-group-title">{t('copyPage.paragraphs')}</h3>
         <p className="section-note">
-          Both languages need the same number of paragraphs; they sit side by side on the page.
+          {t('copyPage.paragraphsHint')}
         </p>
 
         {LOCALES.map((locale) => {
@@ -370,15 +373,15 @@ export function CopyPage({ editor }: CopyPageProps) {
           return (
             <Repeatable
               key={locale}
-              label={`${LOCALE_NAMES[locale]} paragraph`}
+              label={t('copyPage.paragraph', { language: LOCALE_NAMES[locale] })}
               count={body.length}
-              addLabel={`Add a ${LOCALE_NAMES[locale]} paragraph`}
+              addLabel={t('copyPage.addParagraph', { language: LOCALE_NAMES[locale] })}
               onAdd={() => writeBody([...body, ''])}
               onRemove={(at) => writeBody(body.filter((_, position) => position !== at))}
               onMove={(at, to) => writeBody(moved(body, at, to))}
               renderItem={(at) => (
                 <TextField
-                  label={`Paragraph ${at + 1}`}
+                  label={t('copyPage.paragraphNumber', { number: at + 1 })}
                   multiline
                   value={body[at] ?? ''}
                   onChange={(value) =>

@@ -7,6 +7,7 @@
  */
 import type { ReactNode } from 'react';
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { LOCALES, type LocalisedText, type Locale } from '../content/types';
 
@@ -199,6 +200,7 @@ export function Repeatable({
   renderItem,
   hint,
 }: RepeatableProps) {
+  const { t } = useTranslation();
   return (
     <section className="repeatable">
       <header className="repeatable-head">
@@ -210,7 +212,7 @@ export function Repeatable({
       {hint !== undefined && <p className="field-hint">{hint}</p>}
 
       {count === 0 ? (
-        <p className="empty">Nothing here yet.</p>
+        <p className="empty">{t('common.empty')}</p>
       ) : (
         <ol className="repeatable-list">
           {Array.from({ length: count }, (_, at) => (
@@ -241,7 +243,7 @@ export function Repeatable({
                   aria-label={`Remove ${label} ${at + 1}`}
                   onClick={() => onRemove(at)}
                 >
-                  Remove
+                  {t('common.remove')}
                 </button>
               </div>
             </li>

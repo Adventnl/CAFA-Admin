@@ -12,6 +12,7 @@
  * half-succeed.
  */
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { ControlPanelPage } from './pages/ControlPanelPage';
 import { CopyPage } from './pages/CopyPage';
@@ -31,6 +32,7 @@ import { ProblemList } from './ui/ProblemList';
 import { useEditor } from './useEditor';
 
 export function App() {
+  const { t } = useTranslation();
   const [login, setLogin] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const [loaded, setLoaded] = useState<ContentResponse | null>(null);
@@ -62,10 +64,10 @@ export function App() {
     })();
   }, [login]);
 
-  if (checking) return <p className="centred">Loading…</p>;
+  if (checking) return <p className="centred">{t('app.loading')}</p>;
   if (login === null) return <SignInPage onSignedIn={(session) => setLogin(session.login)} />;
   if (failure !== null) return <p className="centred problem">{failure}</p>;
-  if (loaded === null) return <p className="centred">Loading the site…</p>;
+  if (loaded === null) return <p className="centred">{t('app.loadingSite')}</p>;
 
   return (
     <Editing

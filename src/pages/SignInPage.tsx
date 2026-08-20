@@ -10,6 +10,7 @@
  * the server decides that, and this only prints it.
  */
 import { useId, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { sessionService } from '../services/session';
 import type { SessionResponse } from '../services/types';
@@ -19,6 +20,7 @@ interface SignInPageProps {
 }
 
 export function SignInPage({ onSignedIn }: SignInPageProps) {
+  const { t, i18n } = useTranslation();
   const usernameId = useId();
   const passwordId = useId();
 
@@ -37,20 +39,25 @@ export function SignInPage({ onSignedIn }: SignInPageProps) {
       // No `setSigningIn(false)` on this path: the session replaces this screen.
       onSignedIn(await sessionService.signIn(username, password));
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : 'The sign-in could not be completed.');
+      setProblem(error instanceof Error ? error.message : t('signin.failed'));
       setSigningIn(false);
     }
   }
 
   return (
     <main className="centred sign-in">
-      <h1>c.a.f.a atelier — editor</h1>
-      <p>Sign in to edit the site.</p>
+      <div className="signin-language segmented" role="group" aria-label={t('account.language')}>
+        <button type="button" className={i18n.resolvedLanguage === 'en' ? 'is-selected' : ''} onClick={() => void i18n.changeLanguage('en')}>EN</button>
+        <button type="button" className={i18n.resolvedLanguage === 'zh' ? 'is-selected' : ''} onClick={() => void i18n.changeLanguage('zh')}>中文</button>
+      </div>
+      <span className="signin-mark">c.a.f.a</span>
+      <h1>{t('app.editor')}</h1>
+      <p>{t('signin.intro')}</p>
 
       <form className="sign-in-form" onSubmit={(event) => void submit(event)}>
         <div className="field">
           <label className="field-label" htmlFor={usernameId}>
-            Username
+            {t('signin.username')}
           </label>
           <input
             id={usernameId}
@@ -71,7 +78,7 @@ export function SignInPage({ onSignedIn }: SignInPageProps) {
 
         <div className="field">
           <label className="field-label" htmlFor={passwordId}>
-            Password
+            {t('signin.password')}
           </label>
           <input
             id={passwordId}
@@ -91,7 +98,7 @@ export function SignInPage({ onSignedIn }: SignInPageProps) {
         </p>
 
         <button className="button button-primary" type="submit" disabled={signingIn}>
-          {signingIn ? 'Signing in…' : 'Sign in'}
+          {signingIn ? t('signin.working') : t('signin.action')}
         </button>
       </form>
     </main>

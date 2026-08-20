@@ -2,6 +2,7 @@
  * Programmes. Four of them, no pages of their own — one list, edited in place.
  */
 import { emptyLocalised, type Program } from '../content/types';
+import { useTranslation } from 'react-i18next';
 import type { Editor } from '../useEditor';
 import { LocalisedField, moved, Repeatable, TextField } from '../ui/fields';
 
@@ -20,6 +21,7 @@ interface ProgramsPageProps {
 }
 
 export function ProgramsPage({ editor }: ProgramsPageProps) {
+  const { t } = useTranslation();
   const programs = editor.content.programs;
 
   const write = (at: number, program: Program) =>
@@ -31,13 +33,13 @@ export function ProgramsPage({ editor }: ProgramsPageProps) {
   return (
     <section>
       <header className="section-head">
-        <h2>Programmes</h2>
+        <h2>{t('pages.programs')}</h2>
       </header>
 
       <Repeatable
-        label="Programme"
+        label={t('pages.program')}
         count={programs.length}
-        addLabel="Add a programme"
+        addLabel={t('pages.addProgram')}
         onAdd={() => editor.update('programs', [...programs, blankProgram()])}
         onRemove={(at) =>
           editor.update(
@@ -52,29 +54,29 @@ export function ProgramsPage({ editor }: ProgramsPageProps) {
           return (
             <>
               <TextField
-                label="Key"
+                label={t('fields.key')}
                 value={program.slug}
                 onChange={(slug) => write(at, { ...program, slug })}
                 placeholder="summer-atelier"
-                hint="Not shown to anyone. Lowercase letters, numbers and hyphens."
+                hint={t('programPage.keyHint')}
               />
               <LocalisedField
-                label="Name"
+                label={t('fields.name')}
                 value={program.name}
                 onChange={(name) => write(at, { ...program, name })}
               />
               <LocalisedField
-                label="Who it is for"
+                label={t('fields.audience')}
                 value={program.audience}
                 onChange={(audience) => write(at, { ...program, audience })}
               />
               <LocalisedField
-                label="How long"
+                label={t('fields.duration')}
                 value={program.duration}
                 onChange={(duration) => write(at, { ...program, duration })}
               />
               <LocalisedField
-                label="Summary"
+                label={t('fields.summary')}
                 value={program.summary}
                 onChange={(summary) => write(at, { ...program, summary })}
                 multiline

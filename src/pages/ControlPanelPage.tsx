@@ -13,6 +13,7 @@
  * second Publish button is a second thing to keep in step with the first.
  */
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { href, navigate, type RoutePath } from '../routes';
 import { connectorService } from '../services/connectors';
@@ -26,6 +27,7 @@ interface ControlPanelPageProps {
 }
 
 export function ControlPanelPage({ editor }: ControlPanelPageProps) {
+  const { t, i18n } = useTranslation();
   const [status, setStatus] = useState<SiteStatus | null>(null);
   const [connectors, setConnectors] = useState<number | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -60,105 +62,104 @@ export function ControlPanelPage({ editor }: ControlPanelPageProps) {
   return (
     <section>
       <div className="section-head">
-        <h2>Control panel</h2>
+        <h2>{t('dashboard.title')}</h2>
       </div>
       <p className="section-note">
-        The state of the site, and the way in to every part of it. Saving keeps the draft; the
-        preview shows the draft; publishing is what the public sees.
+        {t('dashboard.intro')}
       </p>
 
       {failure !== null && <p className="problem">{failure}</p>}
 
-      <h3 className="panel-heading">Right now</h3>
+      <h3 className="panel-heading">{t('dashboard.now')}</h3>
       <div className="tiles">
         <Tile
-          label="Draft"
-          value={editor.dirty ? 'Unsaved changes' : 'Everything saved'}
+          label={t('dashboard.draft')}
+          value={editor.dirty ? t('publish.unsaved') : t('dashboard.everythingSaved')}
           note={
             editor.problems.length > 0
-              ? `${editor.problems.length} problem${editor.problems.length === 1 ? '' : 's'} block the save`
-              : 'Saving writes the live tables and rebuilds the preview.'
+              ? t('dashboard.problemsBlock', { count: editor.problems.length })
+              : t('dashboard.savingBuildsPreview')
           }
           warn={editor.dirty || editor.problems.length > 0}
         />
         <Tile
-          label="Published"
-          value={status === null ? '…' : (status.latestRevision?.toString() ?? 'Nothing yet')}
+          label={t('dashboard.published')}
+          value={status === null ? '…' : (status.latestRevision?.toString() ?? t('dashboard.nothingYet'))}
           note={
             status?.publishedAt == null
-              ? 'Nothing has been published from this admin.'
-              : `Revision published ${formatPublished(status.publishedAt)}.`
+              ? t('dashboard.nothingPublished')
+              : t('dashboard.revisionPublished', { date: formatPublished(status.publishedAt, i18n.language) })
           }
         />
         <Tile
-          label="Live site"
-          value={status === null ? '…' : deployment(status.latestRevision, status.production.revision)}
-          note={status?.production.url ?? 'No production URL configured.'}
+          label={t('dashboard.liveSite')}
+          value={status === null ? '…' : t(deploymentKey(status.latestRevision, status.production.revision))}
+          note={status?.production.url ?? t('dashboard.noProduction')}
           warn={status !== null && status.unpublished}
           link={status?.production.url ?? undefined}
         />
         <Tile
-          label="Preview"
+          label={t('dashboard.preview')}
           value={
             status === null
               ? '…'
               : status.preview.url === null
-                ? 'Not configured'
-                : deployment(status.draftRevision, status.preview.revision)
+                ? t('common.notConfigured')
+                : t(deploymentKey(status.draftRevision, status.preview.revision))
           }
-          note={status?.preview.url ?? 'The preview build is optional.'}
+          note={status?.preview.url ?? t('dashboard.previewOptional')}
           link={status?.preview.url ?? undefined}
         />
       </div>
 
-      <h3 className="panel-heading">What is in the site</h3>
+      <h3 className="panel-heading">{t('dashboard.contents')}</h3>
       <div className="tiles">
         <Tile
-          label="Works"
+          label={t('dashboard.works')}
           value={String(content.works.length)}
-          note={privateWorks === 0 ? 'All of them public.' : `${privateWorks} private — listed, no page.`}
+          note={privateWorks === 0 ? t('dashboard.allPublic') : t('dashboard.privateWorks', { count: privateWorks })}
           to="works"
         />
-        <Tile label="Programmes" value={String(content.programs.length)} note="Teaching." to="programs" />
-        <Tile label="Mentors" value={String(content.mentors.length)} note="With portraits." to="mentors" />
+        <Tile label={t('dashboard.programs')} value={String(content.programs.length)} note={t('dashboard.teaching')} to="programs" />
+        <Tile label={t('dashboard.mentors')} value={String(content.mentors.length)} note={t('dashboard.withPortraits')} to="mentors" />
         <Tile
-          label="Photographs"
+          label={t('dashboard.photos')}
           value={String(photographs)}
-          note="In the draft, across works, mentors and the studio."
+          note={t('dashboard.photoNote')}
           to="works"
         />
         <Tile
-          label="Site text"
+          label={t('dashboard.siteText')}
           value="中文 / EN"
-          note="Both languages, always. A blank in either blocks the save."
+          note={t('dashboard.bilingualNote')}
           to="copy"
         />
         <Tile
-          label="Studio & contact"
-          value={content.site.contact.email === '' ? 'Incomplete' : 'Set'}
-          note="Address, hours, and how people reach you."
+          label={t('dashboard.studio')}
+          value={content.site.contact.email === '' ? t('common.incomplete') : t('common.set')}
+          note={t('dashboard.contactNote')}
           to="site"
         />
       </div>
 
-      <h3 className="panel-heading">For the frontend</h3>
+      <h3 className="panel-heading">{t('dashboard.frontend')}</h3>
       <div className="tiles">
         <Tile
-          label="Connectors"
+          label={t('dashboard.connectors')}
           value={connectors === null ? '…' : String(connectors)}
-          note="Read-only endpoints serving the published revision. No writes, no drafts."
+          note={t('dashboard.connectorsNote')}
           to="dev"
         />
         <Tile
           label="api.json"
           value="OpenAPI 3.1"
-          note="Compiled from the connectors themselves. Hand it to whoever builds the site."
+          note={t('dashboard.apiNote')}
           link="/api.json"
         />
         <Tile
-          label="History"
-          value="Append-only"
-          note="Every revision that was ever live, and the way back to one."
+          label={t('dashboard.history')}
+          value={t('dashboard.historyValue')}
+          note={t('dashboard.historyNote')}
           to="history"
         />
       </div>
@@ -221,9 +222,9 @@ function Tile({ label, value, note, to, link, warn }: TileProps) {
  * was built from into build-info.json, so "live" is what the site says about
  * itself rather than a guess from how long ago the deploy hook fired.
  */
-function deployment(expected: number | null, actual: number | null): string {
-  if (expected === null || actual === null) return 'Unknown';
-  return expected === actual ? 'Up to date' : 'Building…';
+function deploymentKey(expected: number | null, actual: number | null) {
+  if (expected === null || actual === null) return 'common.unknown' as const;
+  return expected === actual ? ('common.upToDate' as const) : ('common.building' as const);
 }
 
 /** Every photograph the draft names, counted once each. */
@@ -244,8 +245,8 @@ function countPhotographs(content: ContentSet): number {
 }
 
 /** D1 stores UTC without a zone marker; saying so stops it reading as local. */
-function formatPublished(value: string): string {
+function formatPublished(value: string, language: string): string {
   const parsed = new Date(`${value.replace(' ', 'T')}Z`);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
+  return parsed.toLocaleString(language.startsWith('zh') ? 'zh-CN' : 'en-NZ');
 }

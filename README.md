@@ -76,8 +76,9 @@ is ahead of it, whether each origin has caught up, and how much of everything
 there is. It writes nothing. Publishing stays in the bar at the top, where it is
 on every page.
 
-The last item in the sidebar is the **dev panel**, and it is for whoever is
-building the frontend rather than for the studio. It lists every public
+The account menu in the header links to **Developer tools**, kept outside the
+studio's editorial navigation. It is for whoever is building the frontend rather
+than for the studio. It lists every public
 endpoint, what comes back from it, and lets you send the request and read the
 answer without leaving the page — and it offers `api.json`, which is what you
 hand to the other repository.

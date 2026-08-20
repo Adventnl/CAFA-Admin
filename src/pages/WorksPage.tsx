@@ -6,6 +6,7 @@
  * here and stored as the `position` column on the works table.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   emptyLocalised,
@@ -26,12 +27,6 @@ import {
   TextField,
 } from '../ui/fields';
 import { ImageField } from '../ui/ImageField';
-
-const STATUS_LABELS: Record<WorkStatus, string> = {
-  completed: 'Completed — has its own page',
-  'in-progress': 'In progress — has its own page',
-  private: 'Private — listed, but not clickable and publishes no images',
-};
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -60,6 +55,7 @@ interface WorksPageProps {
 }
 
 export function WorksPage({ editor }: WorksPageProps) {
+  const { t } = useTranslation();
   const works = editor.content.works;
   const [openAt, setOpenAt] = useState<number | null>(null);
 
@@ -88,7 +84,7 @@ export function WorksPage({ editor }: WorksPageProps) {
   return (
     <section>
       <header className="section-head">
-        <h2>Works</h2>
+        <h2>{t('pages.works')}</h2>
         <button
           type="button"
           className="button button-primary"
@@ -97,13 +93,12 @@ export function WorksPage({ editor }: WorksPageProps) {
             setOpenAt(works.length);
           }}
         >
-          Add a work
+          {t('pages.addWork')}
         </button>
       </header>
 
       <p className="section-note">
-        The order here is the order on the site. It is not sorted by year — move rows to change
-        what a visitor meets first.
+        {t('pages.worksOrder')}
       </p>
 
       <ol className="works-list">
@@ -112,12 +107,12 @@ export function WorksPage({ editor }: WorksPageProps) {
             <span className="works-index">{String(work.index).padStart(2, '0')}</span>
 
             <button type="button" className="works-open" onClick={() => setOpenAt(at)}>
-              <span className="works-title">{work.title.zh || 'Untitled'}</span>
-              <span className="works-title-en">{work.title.en || 'Untitled'}</span>
+              <span className="works-title">{work.title.zh || t('pages.untitled')}</span>
+              <span className="works-title-en">{work.title.en || t('pages.untitled')}</span>
             </button>
 
             <span className="works-meta">{work.year}</span>
-            <span className={`badge badge-${work.status}`}>{work.status}</span>
+            <span className={`badge badge-${work.status}`}>{t(`works.statusShort.${work.status}`)}</span>
 
             <span className="works-controls">
               <button
@@ -154,6 +149,7 @@ interface WorkFormProps {
 }
 
 function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
+  const { t } = useTranslation();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const namedYet = SLUG.test(work.slug);
   const folder = `works/${work.slug}`;
@@ -164,53 +160,53 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
     <section>
       <header className="section-head">
         <button type="button" className="button button-quiet" onClick={onClose}>
-          ← All works
+          ← {t('pages.allWorks')}
         </button>
-        <h2>{work.title.zh || work.title.en || 'New work'}</h2>
+        <h2>{work.title.zh || work.title.en || t('pages.newWork')}</h2>
       </header>
 
       <TextField
-        label="Web address"
+        label={t('fields.webAddress')}
         value={work.slug}
         onChange={(value) => set('slug', value)}
         placeholder="salt-and-scaffold"
         hint={
           namedYet
-            ? `The page will be at /zh/works/${work.slug}/. Changing this breaks any link anyone has already shared.`
-            : 'Lowercase letters, numbers and hyphens. Set this before adding photographs — it decides where they are filed.'
+            ? t('works.addressReady', { slug: work.slug })
+            : t('works.addressEmpty')
         }
       />
 
       <div className="row">
         <NumberField
-          label="Number"
+          label={t('fields.number')}
           value={work.index}
           onChange={(value) => set('index', value)}
-          hint="The running number shown in the index."
+          hint={t('works.numberHint')}
         />
-        <NumberField label="Year" value={work.year} onChange={(value) => set('year', value)} />
+        <NumberField label={t('fields.year')} value={work.year} onChange={(value) => set('year', value)} />
       </div>
 
       <SelectField
-        label="Status"
+        label={t('fields.status')}
         value={work.status}
-        options={WORK_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] }))}
+        options={WORK_STATUSES.map((status: WorkStatus) => ({ value: status, label: t(`works.status.${status}`) }))}
         onChange={(value) => set('status', value)}
       />
 
-      <LocalisedField label="Title" value={work.title} onChange={(value) => set('title', value)} />
+      <LocalisedField label={t('fields.title')} value={work.title} onChange={(value) => set('title', value)} />
 
       <LocalisedField
-        label="Summary"
+        label={t('fields.summary')}
         value={work.summary}
         onChange={(value) => set('summary', value)}
         multiline
       />
 
       <Repeatable
-        label="Discipline"
+        label={t('fields.discipline')}
         count={work.discipline.length}
-        addLabel="Add a discipline"
+        addLabel={t('works.addDiscipline')}
         onAdd={() => set('discipline', [...work.discipline, emptyLocalised()])}
         onRemove={(at) =>
           set(
@@ -224,7 +220,7 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
           if (entry === undefined) return null;
           return (
             <LocalisedField
-              label={`Discipline ${at + 1}`}
+              label={t('works.disciplineNumber', { number: at + 1 })}
               value={entry}
               onChange={(value) =>
                 set(
@@ -238,9 +234,9 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
       />
 
       <Repeatable
-        label="Credits"
+        label={t('fields.credits')}
         count={work.credits.length}
-        addLabel="Add a credit"
+        addLabel={t('works.addCredit')}
         onAdd={() => set('credits', [...work.credits, { role: emptyLocalised(), name: emptyLocalised() }])}
         onRemove={(at) =>
           set(
@@ -260,12 +256,12 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
           return (
             <>
               <LocalisedField
-                label="Role"
+                label={t('fields.role')}
                 value={credit.role}
                 onChange={(role) => write({ ...credit, role })}
               />
               <LocalisedField
-                label="Name"
+                label={t('fields.name')}
                 value={credit.name}
                 onChange={(name) => write({ ...credit, name })}
               />
@@ -277,7 +273,7 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
       {namedYet ? (
         <>
           <ImageField
-            label="Cover"
+            label={t('fields.cover')}
             value={work.cover}
             onChange={(value) => set('cover', value)}
             folder={folder}
@@ -287,10 +283,10 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
           />
 
           <Repeatable
-            label="Photographs"
+            label={t('fields.photographs')}
             count={work.media.length}
-            addLabel="Add a photograph"
-            hint="These are the images down the right of the work's page, in this order."
+            addLabel={t('fields.addPhoto')}
+            hint={t('works.photoHint')}
             onAdd={() => set('media', [...work.media, blankImage()])}
             onRemove={(at) =>
               set(
@@ -304,7 +300,7 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
               if (image === undefined) return null;
               return (
                 <ImageField
-                  label={`Photograph ${at + 1}`}
+                  label={t('works.photoNumber', { number: at + 1 })}
                   value={image}
                   onChange={(value) =>
                     set(
@@ -329,8 +325,8 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
           />
         </>
       ) : (
-        <Field label="Photographs">
-          <p className="empty">Give this work a web address first — it decides where its photographs are filed.</p>
+        <Field label={t('fields.photographs')}>
+          <p className="empty">{t('works.needsAddress')}</p>
         </Field>
       )}
 
@@ -338,8 +334,7 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
         {confirmingDelete ? (
           <div className="confirm">
             <p>
-              Remove <strong>{work.title.zh || work.title.en || 'this work'}</strong> from the site?
-              Its photographs stay in the repository, so this can be undone by a developer.
+              {t('works.removeQuestion', { title: work.title.zh || work.title.en || t('pages.newWork') })}
             </p>
             <button
               type="button"
@@ -352,10 +347,10 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
                 onClose();
               }}
             >
-              Remove it
+              {t('works.removeIt')}
             </button>
             <button type="button" className="button" onClick={() => setConfirmingDelete(false)}>
-              Keep it
+              {t('works.keepIt')}
             </button>
           </div>
         ) : (
@@ -364,7 +359,7 @@ function WorkForm({ work, editor, onChange, onClose }: WorkFormProps) {
             className="button button-danger"
             onClick={() => setConfirmingDelete(true)}
           >
-            Remove this work
+            {t('works.removeWork')}
           </button>
         )}
       </footer>

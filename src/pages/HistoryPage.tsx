@@ -13,6 +13,7 @@
  * says so when that is the case.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { publishService } from '../services/publish';
 import type { RevisionSummary } from '../services/types';
@@ -23,6 +24,7 @@ interface HistoryPageProps {
 }
 
 export function HistoryPage({ editor }: HistoryPageProps) {
+  const { t } = useTranslation();
   const [revisions, setRevisions] = useState<RevisionSummary[] | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<number | null>(null);
@@ -64,19 +66,18 @@ export function HistoryPage({ editor }: HistoryPageProps) {
   return (
     <section>
       <div className="section-head">
-        <h2>History</h2>
+        <h2>{t('pages.history')}</h2>
       </div>
       <p className="section-note">
-        Each publish appends a revision. Restoring one publishes its content again as a new
-        revision, so nothing that was ever live is lost.
+        {t('historyPage.intro')}
       </p>
 
       {failure !== null && <p className="problem">{failure}</p>}
       {notice !== null && <p className="publish-notice">{notice}</p>}
 
-      {revisions === null && failure === null && <p className="empty">Reading the history…</p>}
+      {revisions === null && failure === null && <p className="empty">{t('historyPage.loading')}</p>}
       {revisions !== null && revisions.length === 0 && (
-        <p className="empty">Nothing has been published yet.</p>
+        <p className="empty">{t('historyPage.empty')}</p>
       )}
 
       {revisions !== null && revisions.length > 0 && (
@@ -86,7 +87,7 @@ export function HistoryPage({ editor }: HistoryPageProps) {
               <div className="repeatable-head">
                 <div className="repeatable-title">
                   <span className="works-index">{revision.id}</span> {revision.message}
-                  {at === 0 && <span className="pill">Live</span>}
+                  {at === 0 && <span className="pill">{t('common.live')}</span>}
                 </div>
                 <div className="repeatable-controls">
                   {at !== 0 && (
@@ -96,7 +97,7 @@ export function HistoryPage({ editor }: HistoryPageProps) {
                       disabled={busy}
                       onClick={() => setConfirming(revision.id)}
                     >
-                      Restore
+                      {t('historyPage.restore')}
                     </button>
                   )}
                 </div>
@@ -109,13 +110,11 @@ export function HistoryPage({ editor }: HistoryPageProps) {
               {confirming === revision.id && (
                 <div className="confirm">
                   <p>
-                    Publish revision {revision.id} again? It becomes the newest revision and the
-                    live site rebuilds.
+                    {t('historyPage.question', { revision: revision.id })}
                   </p>
                   {editor.dirty && (
                     <p className="problem">
-                      You have unsaved edits. They stay in the draft and will be behind the live
-                      site until you save and publish again.
+                      {t('historyPage.dirtyWarning')}
                     </p>
                   )}
                   <div className="repeatable-controls">
@@ -125,7 +124,7 @@ export function HistoryPage({ editor }: HistoryPageProps) {
                       disabled={busy}
                       onClick={() => void onRestore(revision.id)}
                     >
-                      {busy ? 'Restoring…' : 'Restore it'}
+                      {busy ? t('historyPage.restoring') : t('historyPage.restoreIt')}
                     </button>
                     <button
                       type="button"
@@ -133,7 +132,7 @@ export function HistoryPage({ editor }: HistoryPageProps) {
                       disabled={busy}
                       onClick={() => setConfirming(null)}
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </div>

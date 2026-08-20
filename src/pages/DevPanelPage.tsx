@@ -14,6 +14,7 @@
  * not in the document at all.
  */
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   connectorService,
@@ -28,6 +29,7 @@ import {
 const SHOWN = 12_000;
 
 export function DevPanelPage() {
+  const { t } = useTranslation();
   const [spec, setSpec] = useState<ApiDocument | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -42,7 +44,7 @@ export function DevPanelPage() {
   }, []);
 
   if (failure !== null) return <p className="problem">{failure}</p>;
-  if (spec === null) return <p className="empty">Reading the API document…</p>;
+  if (spec === null) return <p className="empty">{t('devPage.loading')}</p>;
 
   const groups = groupsOf(spec);
   const server = spec.servers[0]?.url ?? window.location.origin;
@@ -51,26 +53,24 @@ export function DevPanelPage() {
   return (
     <section className="dev">
       <div className="section-head">
-        <h2>Dev panel</h2>
+        <h2>{t('pages.developer')}</h2>
         <span className="pill">v{spec.info.version}</span>
         <span className="pill">OpenAPI {spec.openapi}</span>
         <span className="pill">
-          {count} connector{count === 1 ? '' : 's'}
+          {t('devPage.connectors', { count })}
         </span>
       </div>
       <p className="section-note">
-        The read-only half of this API, as a frontend sees it. It is compiled from the connectors
-        themselves each time it is asked for, so it is never out of date with what the Worker
-        answers.
+        {t('devPage.intro')}
       </p>
 
       <div className="dev-server">
         <div>
-          <span className="tile-label">Server</span>
+          <span className="tile-label">{t('devPage.server')}</span>
           <code className="dev-origin">{server}</code>
         </div>
         <a className="button" href={DOCUMENT_PATH} download="api.json">
-          Download api.json
+          {t('devPage.download')}
         </a>
       </div>
 
@@ -117,6 +117,7 @@ interface ConnectorCardProps {
 }
 
 function ConnectorCard({ connector, server }: ConnectorCardProps) {
+  const { t } = useTranslation();
   // Path parameters start at their example so the first request works; query
   // parameters start empty, because empty is what a client sends by default and
   // that is the answer worth seeing first.
@@ -205,7 +206,7 @@ function ConnectorCard({ connector, server }: ConnectorCardProps) {
           {path}
         </code>
         <button type="button" className="button" disabled={busy} onClick={() => void send()}>
-          {busy ? 'Asking…' : 'Send request'}
+          {busy ? t('devPage.sending') : t('devPage.send')}
         </button>
       </div>
 
@@ -224,7 +225,7 @@ function ConnectorCard({ connector, server }: ConnectorCardProps) {
 
       {connector.schema !== undefined && (
         <details className="connector-schema">
-          <summary>Response shape</summary>
+          <summary>{t('devPage.response')}</summary>
           <pre className="connector-body">{JSON.stringify(connector.schema, null, 2)}</pre>
         </details>
       )}

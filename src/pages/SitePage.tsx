@@ -7,6 +7,7 @@
  * with a deploy behind it — not something to expose on a form that says "save".
  */
 import { emptyLocalised, type ImageRef, type SiteContent } from '../content/types';
+import { useTranslation } from 'react-i18next';
 import { nextMediaName } from '../images';
 import type { Editor } from '../useEditor';
 import { LocalisedField, moved, Repeatable, TextField } from '../ui/fields';
@@ -17,6 +18,7 @@ interface SitePageProps {
 }
 
 export function SitePage({ editor }: SitePageProps) {
+  const { t } = useTranslation();
   const site = editor.content.site;
 
   const set = <K extends keyof SiteContent>(key: K, value: SiteContent[K]) =>
@@ -30,38 +32,38 @@ export function SitePage({ editor }: SitePageProps) {
   return (
     <section>
       <header className="section-head">
-        <h2>Studio &amp; contact</h2>
+        <h2>{t('pages.site')}</h2>
       </header>
 
-      <LocalisedField label="Studio name" value={site.name} onChange={(name) => set('name', name)} />
+      <LocalisedField label={t('fields.studioName')} value={site.name} onChange={(name) => set('name', name)} />
 
       <TextField
-        label="Email"
+        label={t('fields.email')}
         value={site.contact.email}
         onChange={(email) => setContact({ email })}
         inputMode="email"
       />
       <TextField
-        label="WeChat"
+        label={t('fields.wechat')}
         value={site.contact.wechat}
         onChange={(wechat) => setContact({ wechat })}
       />
       <LocalisedField
-        label="Address"
+        label={t('fields.address')}
         value={site.contact.address}
         onChange={(address) => setContact({ address })}
       />
       <LocalisedField
-        label="Opening hours"
+        label={t('fields.hours')}
         value={site.contact.hours}
         onChange={(hours) => setContact({ hours })}
       />
 
       <Repeatable
-        label="Studio photograph"
+        label={t('fields.studioPhoto')}
         count={site.studio.length}
-        addLabel="Add a photograph"
-        hint="These run down the home page below the statement, and across the about page."
+        addLabel={t('fields.addPhoto')}
+        hint={t('sitePage.photosHint')}
         onAdd={() => set('studio', [...site.studio, blankStudio()])}
         onRemove={(at) =>
           set(
@@ -75,7 +77,7 @@ export function SitePage({ editor }: SitePageProps) {
           if (image === undefined) return null;
           return (
             <ImageField
-              label={`Studio photograph ${at + 1}`}
+              label={`${t('fields.studioPhoto')} ${at + 1}`}
               value={image}
               onChange={(value) =>
                 set(

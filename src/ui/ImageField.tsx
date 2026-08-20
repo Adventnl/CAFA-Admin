@@ -8,6 +8,7 @@
  * than the only one.
  */
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { emptyLocalised, type ImageRef } from '../content/types';
 import { mediaKey } from '../images';
@@ -34,6 +35,7 @@ export function ImageField({
   mediaUrl,
   onUpload,
 }: ImageFieldProps) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -63,7 +65,7 @@ export function ImageField({
       <div className="image-row">
         <div className="image-preview">
           {value.src === '' ? (
-            <span className="image-empty">No image</span>
+            <span className="image-empty">{t('common.noImage')}</span>
           ) : (
             <img src={mediaUrl(value.src)} alt="" loading="lazy" />
           )}
@@ -71,7 +73,7 @@ export function ImageField({
 
         <div className="image-controls">
           <label className="button">
-            {value.src === '' ? 'Choose a photograph' : 'Replace'}
+            {value.src === '' ? t('common.choosePhoto') : t('common.replace')}
             <input
               type="file"
               accept="image/jpeg,image/png"
@@ -80,7 +82,7 @@ export function ImageField({
               onChange={(event) => void choose(event.target.files?.[0])}
             />
           </label>
-          {busy && <p className="field-hint">Resizing and uploading…</p>}
+          {busy && <p className="field-hint">{t('common.uploading')}</p>}
           {failure !== null && <p className="problem">{failure}</p>}
           {value.src !== '' && <p className="field-hint image-path">{value.src}</p>}
         </div>
@@ -95,17 +97,16 @@ export function ImageField({
           }
         />
         <span>
-          Decorative — this photograph carries no information a description would need to
-          repeat
+          {t('common.decorative')}
         </span>
       </label>
 
       {!decorative && (
         <LocalisedField
-          label="Description, for anyone who cannot see it"
+          label={t('common.imageDescription')}
           value={value.alt === '' ? emptyLocalised() : value.alt}
           onChange={(alt) => onChange({ ...value, alt })}
-          hint="Say what is in the photograph, not that it is a photograph."
+          hint={t('common.imageHint')}
         />
       )}
     </section>
