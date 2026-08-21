@@ -8,13 +8,17 @@
  * which field was blank.
  */
 import {
+  HEADING_KINDS,
+  HOME_SLUG,
   LOCALES,
+  SECTION_KINDS,
   WORK_STATUSES,
   type ContentSet,
   type Dictionary,
   type ImageRef,
   type LocalisedText,
   type Locale,
+  type Page,
 } from './types';
 
 export interface Problem {
@@ -98,18 +102,6 @@ function checkDictionary(dictionary: Dictionary, locale: Locale): Problem[] {
       }
       return;
     }
-    if (Array.isArray(value)) {
-      if (value.length === 0) {
-        problems.push({
-          section,
-          record: trail[0] ?? 'text',
-          label: trail.join(' › '),
-          message: 'needs at least one paragraph',
-        });
-      }
-      value.forEach((item, at) => walk(item, [...trail, `paragraph ${at + 1}`]));
-      return;
-    }
     if (typeof value === 'object' && value !== null) {
       for (const [key, nested] of Object.entries(value)) walk(nested, [...trail, key]);
     }
@@ -119,8 +111,87 @@ function checkDictionary(dictionary: Dictionary, locale: Locale): Problem[] {
   return problems;
 }
 
+/**
+ * A page, and the two rules about a *set* of its parts that no column can hold.
+ *
+ * The h1 rule is the one worth stating out loud: `heading` sets the page's own
+ * title as its h1 and `statement` sets its line as one, so exactly one of them
+ * has to be on a page. Two is a broken document outline; none is a page a
+ * screen reader cannot name. The template refuses to build either, and catching
+ * it here means the editor is told which page rather than the build.
+ */
+function checkPage(page: Page): Problem[] {
+  const check = new Collector('pages', page.slug === HOME_SLUG ? 'front page' : page.slug);
+
+  // The front page's address is the site's own, which the empty slug is the
+  // spelling of. Every other page is a segment under the locale.
+  if (page.slug !== HOME_SLUG) check.slug(page.slug, 'Web address');
+  check.localised(page.title, 'Title');
+  check.localised(page.description, 'Description for search engines');
+  if (page.navLabel !== null) check.localised(page.navLabel, 'Name in the menu');
+
+  const headings = page.sections.filter((section) => HEADING_KINDS.includes(section.kind));
+  if (headings.length === 0) check.add('Sections', 'needs a heading or a statement');
+  if (headings.length > 1) {
+    check.add('Sections', 'has more than one heading or statement — a page may have one');
+  }
+
+  page.sections.forEach((section, at) => {
+    const label = `Section ${at + 1}`;
+    if (!SECTION_KINDS.includes(section.kind)) {
+      return check.add(label, 'is a kind the site cannot draw');
+    }
+    switch (section.kind) {
+      case 'statement':
+        return check.localised(section.text, `${label} line`);
+      case 'works-grid':
+      case 'mentors':
+        return check.localised(section.text, `${label} heading`);
+      case 'prose':
+        if (section.paragraphs.length === 0) check.add(label, 'needs at least one paragraph');
+        return section.paragraphs.forEach((paragraph, position) =>
+          check.localised(paragraph, `${label} paragraph ${position + 1}`),
+        );
+      case 'gallery':
+        if (section.images.length === 0) check.add(label, 'needs at least one photograph');
+        return section.images.forEach((image, position) =>
+          check.image(image, `${label} photograph ${position + 1}`),
+        );
+      case 'heading':
+      case 'works-index':
+      case 'programs':
+        return;
+    }
+  });
+
+  return check.problems;
+}
+
 export function checkContent(content: ContentSet): Problem[] {
   const problems: Problem[] = [];
+
+  for (const page of content.pages) problems.push(...checkPage(page));
+
+  for (const slug of duplicates(content.pages.map((page) => page.slug))) {
+    problems.push({
+      section: 'pages',
+      record: slug === HOME_SLUG ? 'front page' : slug,
+      label: 'Web address',
+      message: `is used by more than one page ("${slug}")`,
+    });
+  }
+
+  // A site with no front page answers 404 at its own address, so this is not a
+  // preference — it is the one page that cannot be deleted.
+  const home = content.pages.filter((page) => page.slug === HOME_SLUG);
+  if (home.length === 0) {
+    problems.push({
+      section: 'pages',
+      record: 'front page',
+      label: 'Pages',
+      message: 'need one front page — the one whose web address is left blank',
+    });
+  }
 
   for (const work of content.works) {
     const check = new Collector('works', work.slug);
@@ -176,8 +247,6 @@ export function checkContent(content: ContentSet): Problem[] {
   site.text(content.site.contact.wechat, 'WeChat');
   site.localised(content.site.contact.address, 'Address');
   site.localised(content.site.contact.hours, 'Opening hours');
-  if (content.site.studio.length === 0) site.add('Studio photographs', 'needs at least one');
-  content.site.studio.forEach((image, at) => site.image(image, `Studio photograph ${at + 1}`));
   problems.push(...site.problems);
 
   problems.push(...checkDictionary(content.zh, 'zh'));

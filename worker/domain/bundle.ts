@@ -5,72 +5,61 @@
  * it, and the difference is load-bearing in two ways.
  *
  * First, **a private work publishes nothing but its row in the index.** The
- * site lists private works and gives them no page; until now the guarantee that
- * their photographs never reach a browser lived in the frontend, in
- * `getIndexCovers`. Once the content set is fetchable over a public endpoint
- * that is the wrong place for it, so the cover and the media are dropped here,
- * where the data leaves the database.
+ * site lists private works and gives them no page; the guarantee that their
+ * photographs never reach a browser lives here, where the data leaves the
+ * database, rather than in the frontend that draws them.
  *
  * Second, **the parts of `site` that are not editable are added here.** The
- * locales, their names and the shape of the nav are wired to the template's
- * lib/routes.ts, so they are code rather than content — but the nav's *labels*
- * are copy, and the studio should be able to rename an item without a deploy.
- * They live in the copy table under `nav.*` and are lifted out into `site`
- * here, so the template's `Dictionary` type never has to know about them.
+ * locales and their names are wired to the template's lib/routes.ts and to the
+ * deployment, so they are code rather than content — but what a language calls
+ * itself in the switch is a word on a screen, so it lives in the copy table as
+ * `localeName` and is lifted out into `site` here.
  *
- * `url` is the same kind of thing, and arrives the same way. It is the origin
- * the site is deployed on — every canonical, hreflang, og:url and sitemap entry
- * in the template is resolved against it — so it belongs to the deployment,
- * not to the content. It used to be a column on the `site` table, which meant
- * moving domains took a wrangler edit *and* a hand-written UPDATE against D1,
- * with nothing to catch the second one being forgotten and a silently wrong
- * canonical tag as the reward. It now comes from PRODUCTION_URL, which is the
- * same value the admin already polls for build-info.json — one origin, named
- * once. Migration 0002 dropped the column.
+ * The nav used to be here too, as a hardcoded array of four items whose labels
+ * were looked up from `nav.*` copy keys. It is gone, and that is the point of
+ * this change: the bar is a projection of the pages now, derived by the
+ * template from each page's `navLabel`, so nothing in this repository decides
+ * which pages the site has or which of them the bar carries. Adding a page adds
+ * a URL and, if it has a label, an item — with no deploy on either side.
+ *
+ * `url` is the same kind of thing as the locales, and arrives the same way. It
+ * is the origin the site is deployed on — every canonical, hreflang, og:url and
+ * sitemap entry in the template is resolved against it — so it belongs to the
+ * deployment, not to the content. It comes from PRODUCTION_URL, which is the
+ * same value the admin already polls for build-info.json: one origin, named
+ * once. Migration 0002 dropped the column it used to have.
  */
-import { LOCALES, type ContentSet, type Dictionary, type Work } from '../../src/content/types';
+import {
+  SECTION_KINDS,
+  LOCALES,
+  type ContentSet,
+  type Dictionary,
+  type Work,
+} from '../../src/content/types';
 import type { MediaRow } from '../models/rows';
 
 /**
- * The nav, as structure. Each entry names a route or a panel in the template's
- * lib/routes.ts; the label is looked up from the copy key of the same name.
- * Adding an item here without adding its copy key is caught by the build.
- */
-const NAV = [
-  { key: 'works', route: 'works' },
-  { key: 'programs', route: 'programs' },
-  { key: 'about', route: 'about' },
-  { key: 'contact', opens: 'contact' },
-] as const;
-
-/**
- * The destinations a nav item can name, read back off the nav above.
+ * The section kinds, for the document api.json compiles.
  *
- * These exist so api.json can say `enum` rather than `string` on `NavItem`, and
- * they are derived rather than retyped for the usual reason: a second list
- * would be a copy of this one that nobody updates in the same commit. A client
- * generating a route table from the document gets the real set, and adding a
- * nav item widens the document in the same edit that widens the nav.
+ * Re-exported rather than retyped: a client generating types from the document
+ * gets the real set, and a kind added to `PageSection` widens the document in
+ * the same edit that widens the union.
  */
-export const NAV_ROUTES: readonly string[] = NAV.flatMap((item) =>
-  'route' in item ? [item.route] : [],
-);
-
-export const NAV_PANELS: readonly string[] = NAV.flatMap((item) =>
-  'opens' in item ? [item.opens] : [],
-);
+export const PAGE_SECTION_KINDS: readonly string[] = SECTION_KINDS;
 
 /**
  * Copy that describes the chrome rather than a page, and is lifted into `site`
  * instead of staying in the dictionary.
- *
- * These are the keys as they appear *after* unflattening, so `nav.works` and
- * `nav.about` have already become one `nav` object by the time this is applied.
  */
-const CHROME_KEYS = ['nav', 'localeName'];
+const CHROME_KEYS = ['localeName'];
 
 export interface PublishedBundle {
   site: unknown;
+  /**
+   * Every page, in the studio's order — which is also the order of the nav bar,
+   * since the template derives the bar from the pages that carry a `navLabel`.
+   */
+  pages: unknown;
   works: unknown;
   programs: unknown;
   mentors: unknown;
@@ -100,19 +89,10 @@ function pageCopy(dictionary: Dictionary): Record<string, unknown> {
   return Object.fromEntries(Object.entries(record).filter(([key]) => !CHROME_KEYS.includes(key)));
 }
 
-/** The chrome copy, which was stored flat under `nav` and `localeName`. */
-interface Chrome {
-  nav: Record<string, string>;
-  localeName: string;
-}
-
-function chromeOf(dictionary: Dictionary): Chrome {
+/** The chrome copy, which was stored flat under `localeName`. */
+function localeNameOf(dictionary: Dictionary): string {
   const record = dictionary as unknown as Record<string, unknown>;
-  const nav = record.nav;
-  return {
-    nav: typeof nav === 'object' && nav !== null ? (nav as Record<string, string>) : {},
-    localeName: typeof record.localeName === 'string' ? record.localeName : '',
-  };
+  return typeof record.localeName === 'string' ? record.localeName : '';
 }
 
 /**
@@ -174,7 +154,12 @@ export function buildBundle(
     for (const image of work.media) cited.add(image.src);
   }
   for (const mentor of content.mentors) cited.add(mentor.portrait.src);
-  for (const image of content.site.studio) cited.add(image.src);
+  for (const page of content.pages) {
+    for (const section of page.sections) {
+      if (section.kind !== 'gallery') continue;
+      for (const image of section.images) cited.add(image.src);
+    }
+  }
 
   const measured: PublishedBundle['media'] = {};
   for (const row of media) {
@@ -182,9 +167,6 @@ export function buildBundle(
       measured[row.key] = { width: row.width, height: row.height, tint: row.tint };
     }
   }
-
-  const zhChrome = chromeOf(content.zh);
-  const enChrome = chromeOf(content.en);
 
   return {
     site: {
@@ -194,12 +176,9 @@ export function buildBundle(
       // against a base ending in a slash is not the same URL.
       url: siteUrl.replace(/\/$/, ''),
       locales: [...LOCALES],
-      localeNames: { zh: zhChrome.localeName, en: enChrome.localeName },
-      nav: NAV.map((entry) => {
-        const label = { zh: zhChrome.nav[entry.key] ?? '', en: enChrome.nav[entry.key] ?? '' };
-        return 'route' in entry ? { label, route: entry.route } : { label, opens: entry.opens };
-      }),
+      localeNames: { zh: localeNameOf(content.zh), en: localeNameOf(content.en) },
     },
+    pages: content.pages,
     works,
     programs: content.programs,
     mentors: content.mentors,

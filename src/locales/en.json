@@ -16,7 +16,8 @@
     "site": "Studio & contact",
     "copy": "Site text",
     "history": "History",
-    "developer": "Developer tools"
+    "developer": "Developer tools",
+    "pages": "Pages"
   },
   "account": {
     "menu": "Account menu",
@@ -108,13 +109,15 @@
     "privateWorks": "{{count}} private — listed, no page.",
     "teaching": "Teaching.",
     "withPortraits": "With portraits.",
-    "photoNote": "In the draft, across works, mentors and the studio.",
+    "photoNote": "In the draft, across works, mentors and the pages.",
     "bilingualNote": "Both languages, always. A blank in either blocks the save.",
     "contactNote": "Address, hours, and how people reach you.",
     "connectorsNote": "Read-only endpoints serving the published revision. No writes, no drafts.",
     "apiNote": "Compiled from the connectors themselves. Hand it to whoever builds the site.",
     "historyValue": "Append-only",
-    "historyNote": "Every revision that was ever live, and the way back to one."
+    "historyNote": "Every revision that was ever live, and the way back to one.",
+    "pages": "Pages",
+    "pagesNote": "The whole site. Add one and it becomes a URL."
   },
   "pages": {
     "works": "Works",
@@ -132,7 +135,13 @@
     "site": "Studio & contact",
     "siteText": "Site text",
     "history": "History",
-    "developer": "Developer tools"
+    "developer": "Developer tools",
+    "pages": "Pages",
+    "addPage": "Add a page",
+    "allPages": "All pages",
+    "newPage": "New page",
+    "section": "Section",
+    "addSection": "Add a section"
   },
   "fields": {
     "key": "Key",
@@ -157,7 +166,15 @@
     "wechat": "WeChat",
     "address": "Address",
     "hours": "Opening hours",
-    "studioPhoto": "Studio photograph",
+    "description": "Description for search engines",
+    "inMenu": "Show in the menu",
+    "menuName": "Name in the menu",
+    "sectionKind": "What this section is",
+    "line": "The line",
+    "heading": "Heading",
+    "paragraph": "Paragraph",
+    "addParagraph": "Add a paragraph",
+    "paragraphNumber": "Paragraph {{number}}",
     "addPhoto": "Add a photograph"
   },
   "works": {
@@ -193,9 +210,6 @@
     "oneLineHint": "Exactly one sentence. The layout gives it one line.",
     "needsKey": "Give this mentor a key first—it names the portrait file."
   },
-  "sitePage": {
-    "photosHint": "These run down the home page below the statement and across the about page."
-  },
   "historyPage": {
     "intro": "Each publish appends a revision. Restoring one publishes its content again as a new revision, so nothing that was ever live is lost.",
     "loading": "Reading the history…",
@@ -218,11 +232,46 @@
     "response": "Response shape"
   },
   "copyPage": {
-    "intro": "Every field exists in both languages. A blank in either is caught before saving.",
-    "paragraphs": "About — the paragraphs",
-    "paragraphsHint": "Both languages need the same number of paragraphs; they sit side by side on the page.",
-    "paragraph": "{{language}} paragraph",
-    "addParagraph": "Add a {{language}} paragraph",
-    "paragraphNumber": "Paragraph {{number}}"
+    "intro": "Every field exists in both languages. A blank in either is caught before saving."
+  },
+  "sectionKinds": {
+    "heading": "Page heading",
+    "statement": "Statement",
+    "prose": "Paragraphs",
+    "gallery": "Photographs",
+    "works-index": "Index of works",
+    "works-grid": "Grid of works",
+    "programs": "Programmes",
+    "mentors": "Mentors"
+  },
+  "sectionHints": {
+    "heading": "The page’s title, set large at the top. Every page needs either this or a statement, and only one of the two.",
+    "statement": "One line, centred, holding the first screen on its own. It is the page’s heading, so a page with a statement needs no page heading.",
+    "prose": "Running text, one paragraph at a time.",
+    "gallery": "Photographs full width, one at a time, with a lot of space between them.",
+    "works-index": "Every work as a row of numbers and titles, with the photograph appearing on hover. Nothing to fill in — it draws the works.",
+    "works-grid": "The works that have their own page, as a grid of covers.",
+    "programs": "Every programme, one screen at a time. Nothing to fill in — it draws the programmes.",
+    "mentors": "The mentors, read across as the section holds the screen."
+  },
+  "pagePage": {
+    "order": "The order here is the order of the menu. Move a page to change where it sits in the bar.",
+    "sectionCount": "{{count}} section",
+    "sectionCount_other": "{{count}} sections",
+    "inMenu": "in the menu",
+    "notInMenu": "not in the menu",
+    "moveUp": "Move {{page}} up",
+    "moveDown": "Move {{page}} down",
+    "address": "The page will be at /zh/{{slug}}/. Changing this breaks any link already shared.",
+    "addressFront": "Left blank, so this is the front page — it is served at /zh/ and /en/. Every site needs exactly one.",
+    "titleHint": "What the browser tab says, and what a page heading draws.",
+    "descriptionHint": "One or two sentences. It appears under the link in a search result.",
+    "menuHint": "Off means the page still exists at its address; it just is not listed in the bar.",
+    "sectionsHint": "The page is these blocks, top to bottom. Move them to change the page.",
+    "galleryHint": "They run full width, one at a time, in this order.",
+    "frontPageKept": "The front page cannot be removed — it is the site’s own address.",
+    "removeQuestion": "Remove {{page}} from the site? Its address stops working and it leaves the menu. Photographs stay in storage.",
+    "removeIt": "Remove it",
+    "removePage": "Remove this page"
   }
 }

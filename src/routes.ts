@@ -7,7 +7,7 @@
  * Worker checks /api and /auth before it gets there — so /works reaches this
  * file and nothing collides.
  *
- * Eight routes and no parameters do not justify a routing library. What they do
+ * Nine routes and no parameters do not justify a routing library. What they do
  * justify is a route *table*: one array that navigation renders from, that the
  * shell dispatches on, and that keeps content and utility destinations in one
  * typed place. The previous shape had the labels in one const and the
@@ -15,8 +15,9 @@
  * which is two lists to keep in step.
  *
  * The order is the order of the sidebar, and it is meant: the control panel is
- * where you land and where the state of the site is answered, the five editing
- * sections are the work, and the last two are for looking backwards — at what
+ * where you land and where the state of the site is answered, the six editing
+ * sections are the work — pages first, since a page is what the rest appears
+ * on — and the last two are for looking backwards — at what
  * has been published, and at what the site's own frontend can read. The latter
  * is a utility and is reached from the account menu rather than the sidebar.
  */
@@ -24,6 +25,7 @@ import { useSyncExternalStore } from 'react';
 
 export const ROUTES = [
   { path: 'control', labelKey: 'nav.control', group: 'overview' },
+  { path: 'pages', labelKey: 'nav.pages', group: 'content' },
   { path: 'works', labelKey: 'nav.works', group: 'content' },
   { path: 'programs', labelKey: 'nav.programs', group: 'content' },
   { path: 'mentors', labelKey: 'nav.mentors', group: 'content' },

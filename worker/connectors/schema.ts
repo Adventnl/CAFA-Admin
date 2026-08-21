@@ -10,12 +10,12 @@
  *
  * The component schemas below mirror src/content/types.ts as the *published*
  * bundle carries it — which is not quite the editable content set, and the
- * differences are deliberate. worker/domain/bundle.ts adds `url`, `locales`,
- * `localeNames` and `nav` to `site`, lifts `nav` and `localeName` out of each
- * dictionary, and empties a private work's cover and media. What is written
- * here is what a client will actually receive.
+ * differences are deliberate. worker/domain/bundle.ts adds `url`, `locales`
+ * and `localeNames` to `site`, lifts `localeName` out of each dictionary, and
+ * empties a private work's cover and media. What is written here is what a
+ * client will actually receive.
  */
-import { NAV_PANELS, NAV_ROUTES } from '../domain/bundle';
+import { PAGE_SECTION_KINDS } from '../domain/bundle';
 
 export interface JsonSchema {
   type?: 'object' | 'array' | 'string' | 'integer' | 'number' | 'boolean' | 'null';
@@ -171,14 +171,29 @@ export const COMPONENTS: Record<string, JsonSchema> = {
     portrait: ref('Image'),
   }),
 
-  NavItem: some(
+  PageSection: some(
     {
-      label: ref('LocalisedText'),
-      route: choice(NAV_ROUTES, 'The page this item leads to. Present unless `opens` is.'),
-      opens: choice(NAV_PANELS, 'A panel this item opens in place. Present unless `route` is.'),
+      kind: choice(PAGE_SECTION_KINDS, 'What this block is. Each kind is one component on the site.'),
+      text: ref('LocalisedText'),
+      paragraphs: list(ref('LocalisedText'), 'One entry per paragraph. Present on `prose`.'),
+      images: list(ref('Image'), 'The photographs, in order. Present on `gallery`.'),
     },
-    ['label'],
-    'One item of the site’s navigation. Its order and destination are wired to the site’s code; only the label is editable.',
+    ['kind'],
+    'One block on a page. Only `kind` is always present: `text` comes with `statement`, `works-grid` and `mentors`, `paragraphs` with `prose`, `images` with `gallery`, and `heading`, `works-index` and `programs` carry none of them — they draw the page’s own title, the works and the programmes respectively.',
+  ),
+
+  Page: shape(
+    {
+      slug: text('The single path segment under the locale. The empty string is the front page, served at the locale’s own address.'),
+      title: ref('LocalisedText'),
+      description: ref('LocalisedText'),
+      navLabel: {
+        anyOf: [ref('LocalisedText'), { type: 'null' }],
+        description: 'The word in the navigation bar, or null for a page the bar does not carry.',
+      },
+      sections: list(ref('PageSection'), 'The blocks of the page, top to bottom.'),
+    },
+    'One page of the site. The set of pages *is* this array — there is one route behind all of them — and the navigation bar is the pages that carry a `navLabel`, in this order.',
   ),
 
   Site: shape(
@@ -190,8 +205,6 @@ export const COMPONENTS: Record<string, JsonSchema> = {
         { zh: text('What Chinese calls itself in the switch.'), en: text('And English.') },
         'What each language calls itself, in itself.',
       ),
-      nav: list(ref('NavItem'), 'The navigation, in order.'),
-      studio: list(ref('Image'), 'Photographs of the studio.'),
       contact: shape({
         email: text('The studio’s address for enquiries.'),
         wechat: text('The WeChat id.'),
@@ -199,7 +212,7 @@ export const COMPONENTS: Record<string, JsonSchema> = {
         hours: ref('LocalisedText'),
       }),
     },
-    'The studio itself: who it is, where it is, and the chrome around every page.',
+    'The studio itself: who it is and where it is. The navigation is not here — it is the pages that carry a `navLabel`, in `pages` order.',
   ),
 
   Dictionary: shape(
@@ -218,10 +231,7 @@ export const COMPONENTS: Record<string, JsonSchema> = {
         workPager: 'The label on the previous/next pager.',
         close: 'The label on a close button.',
       }),
-      home: words({ statement: 'The statement on the front page.' }),
       works: shape({
-        title: text('The works page heading.'),
-        description: text('Its meta description.'),
         status: words({
           completed: 'What "completed" is called.',
           'in-progress': 'What "in-progress" is called.',
@@ -237,19 +247,8 @@ export const COMPONENTS: Record<string, JsonSchema> = {
         previous: 'The pager’s backward label.',
         next: 'The pager’s forward label.',
       }),
-      programs: words({
-        title: 'The programmes page heading.',
-        description: 'Its meta description.',
-        intro: 'The paragraph above the list.',
-      }),
-      about: shape({
-        title: text('The about page heading.'),
-        description: text('Its meta description.'),
-        body: list(text('One paragraph.'), 'The about text, one entry per paragraph.'),
-        mentorsTitle: text('The heading above the mentors.'),
-        worksTitle: text('The heading above the works.'),
-      }),
       contact: words({
+        nav: 'The word in the navigation bar that opens the panel.',
         title: 'The heading of the contact panel.',
         email: 'The label before the email address.',
         wechat: 'The label before the WeChat id.',
@@ -268,7 +267,7 @@ export const COMPONENTS: Record<string, JsonSchema> = {
       }),
       footer: words({ note: 'The line in the footer.' }),
     },
-    'Every word on the site that is not a work, a programme or a mentor — for one language. The navigation labels are not here: they are in `site.nav`, because they belong to the chrome.',
+    'The words on the chrome — everything that is not a page, a work, a programme or a mentor — for one language. A page’s title, its prose and the headings over its sections are on the page record, because they belong to a page that can be deleted; these outlive every page. The navigation labels are on the pages, except Contact’s, which is here because the panel it opens is not a page.',
   ),
 
   Photograph: shape(
@@ -293,6 +292,7 @@ export const COMPONENTS: Record<string, JsonSchema> = {
   Bundle: shape(
     {
       site: ref('Site'),
+      pages: list(ref('Page'), 'Every page, in the studio’s order — which is also the order of the navigation bar.'),
       works: list(ref('Work'), 'Every work, in index order.'),
       programs: list(ref('Program'), 'Every programme.'),
       mentors: list(ref('Mentor'), 'Every mentor.'),

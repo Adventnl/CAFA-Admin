@@ -145,24 +145,37 @@ Publish first, wire the hook second. The full sequence is in the README.
 ## Details worth knowing before you start
 
 **Nothing is optional.** Every property in every schema is in `required` except
-`NavItem.route`/`NavItem.opens`. That is not laziness — the editor refuses a save
-with a blank in it, both columns of every localised field are `NOT NULL`, and the
-bundle is built by projection rather than by merge. You do not need defensive
-defaults.
+the fields a `PageSection` only has for some kinds. That is not laziness — the
+editor refuses a save with a blank in it, both columns of every localised field
+are `NOT NULL`, and the bundle is built by projection rather than by merge. You
+do not need defensive defaults.
 
 **A private work is listed but has no page.** It appears in `/api/v1/works` with
 `cover.src` as the empty string and `media` empty. Those photographs are dropped
 before a revision is written, so no URL for them ever leaves the database. Render
 the listing; do not generate a route for it.
 
-**The nav is code, its labels are content.** `site.nav` arrives in order, each
-item naming either a `route` or a panel it `opens`, with a label in both
-languages. The destinations are fixed and enumerated in `api.json`; the studio
-can rename an item without a deploy, but cannot add or move one.
+**The pages are the site's structure, and they are content.** `/api/v1/pages`
+answers with every page in order: a `slug`, the words that name it, and an
+ordered list of `sections`. Generate one route per entry — the empty slug is the
+front page, served at the locale's own address — and render each section by its
+`kind`. The studio adds, removes and reorders both pages and sections, so treat
+the list as data, not as a fixture.
 
-**Nav labels are not in the dictionary.** They are in `site.nav`. Everything else
-— headings, labels, accessibility strings, the 404 page — is in
-`/api/v1/copy/{locale}`, one dictionary per language.
+**A section kind is a component you write.** There are eight; three take no
+fields at all and simply mean "the works", "the programmes", "the mentors". The
+enum is in `api.json`, so a generated client fails to compile when a kind is
+added rather than rendering a hole.
+
+**The nav is the pages.** There is no `site.nav`: the bar is the pages whose
+`navLabel` is not null, in `pages` order. The one item that is not a page is
+Contact, which opens a panel over the current page rather than leading anywhere —
+its label is `contact.nav` in the dictionary.
+
+**A page's own words are on the page, not in the dictionary.** Its title, its
+prose and the headings over its sections belong to a page that can be deleted.
+`/api/v1/copy/{locale}` is the chrome that outlives every page — the labels on a
+work, the accessibility strings, the contact card, the footer, the 404.
 
 **`site.url` is the site's own origin**, without a trailing slash, and every
 canonical, hreflang, `og:url` and sitemap entry should resolve against it. It

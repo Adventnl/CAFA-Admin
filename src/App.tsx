@@ -19,6 +19,7 @@ import { CopyPage } from './pages/CopyPage';
 import { DevPanelPage } from './pages/DevPanelPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { MentorsPage } from './pages/MentorsPage';
+import { PagesPage } from './pages/PagesPage';
 import { ProgramsPage } from './pages/ProgramsPage';
 import { SignInPage } from './pages/SignInPage';
 import { SitePage } from './pages/SitePage';
@@ -121,6 +122,8 @@ function Page({ route, editor }: { route: RoutePath; editor: ReturnType<typeof u
       return <ControlPanelPage editor={editor} />;
     case 'dev':
       return <DevPanelPage />;
+    case 'pages':
+      return <PagesPage editor={editor} />;
     case 'works':
       return <WorksPage editor={editor} />;
     case 'programs':

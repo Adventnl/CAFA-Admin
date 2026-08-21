@@ -2,7 +2,7 @@
  * The whole content set, as one unit of work.
  *
  * Each aggregate repository beside this one knows its own tables and nothing
- * else. This file is the only place that knows there are five of them, and it
+ * else. This file is the only place that knows there are six of them, and it
  * exists for one reason: a save has to be atomic. D1 has no interactive
  * transactions, so a write is one `batch()` — which means the aggregates cannot
  * each run their own, they have to hand over statements and let this compose
@@ -21,31 +21,35 @@
 import type { ContentSet } from '../../src/content/types';
 import { deleteCopy, insertCopy, readCopy } from './copy.repository';
 import { deleteMentors, insertMentors, readMentors } from './mentors.repository';
+import { deletePages, insertPages, readPages } from './pages.repository';
 import { deletePrograms, insertPrograms, readPrograms } from './programs.repository';
 import { deleteSite, insertSite, readSite } from './site.repository';
 import { deleteWorks, insertWorks, readWorks } from './works.repository';
 
 export async function readContent(db: D1Database): Promise<ContentSet> {
-  const [site, works, programs, mentors, copy] = await Promise.all([
+  const [site, pages, works, programs, mentors, copy] = await Promise.all([
     readSite(db),
+    readPages(db),
     readWorks(db),
     readPrograms(db),
     readMentors(db),
     readCopy(db),
   ]);
 
-  return { site, works, programs, mentors, zh: copy.zh, en: copy.en };
+  return { site, pages, works, programs, mentors, zh: copy.zh, en: copy.en };
 }
 
 export async function writeContent(db: D1Database, content: ContentSet): Promise<void> {
   await db.batch([
     ...deleteWorks(db),
+    ...deletePages(db),
     ...deleteSite(db),
     ...deletePrograms(db),
     ...deleteMentors(db),
     ...deleteCopy(db),
 
     ...insertSite(db, content.site),
+    ...insertPages(db, content.pages),
     ...insertWorks(db, content.works),
     ...insertPrograms(db, content.programs),
     ...insertMentors(db, content.mentors),

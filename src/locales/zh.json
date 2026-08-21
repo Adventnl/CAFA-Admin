@@ -16,7 +16,8 @@
     "site": "工作室与联系",
     "copy": "网站文字",
     "history": "发布记录",
-    "developer": "开发者工具"
+    "developer": "开发者工具",
+    "pages": "页面"
   },
   "account": {
     "menu": "账户菜单",
@@ -108,13 +109,15 @@
     "privateWorks": "{{count}} 个私密作品——仅在列表显示，没有详情页。",
     "teaching": "教学内容。",
     "withPortraits": "包含导师肖像。",
-    "photoNote": "草稿中作品、导师和工作室所使用的照片。",
+    "photoNote": "草稿中作品、导师与各页面用到的照片。",
     "bilingualNote": "始终同时维护中文和英文，任何一项留空都会阻止保存。",
     "contactNote": "地址、开放时间与联系方式。",
     "connectorsNote": "只读接口仅提供已发布版本，不写入也不提供草稿。",
     "apiNote": "根据接口自动生成，可交给网站前端开发者使用。",
     "historyValue": "仅追加",
-    "historyNote": "保留所有曾经上线的版本，也可以从这里恢复。"
+    "historyNote": "保留所有曾经上线的版本，也可以从这里恢复。",
+    "pages": "页面",
+    "pagesNote": "整个网站。新增一个就是一个网址。"
   },
   "pages": {
     "works": "作品",
@@ -132,7 +135,13 @@
     "site": "工作室与联系",
     "siteText": "网站文字",
     "history": "发布记录",
-    "developer": "开发者工具"
+    "developer": "开发者工具",
+    "pages": "页面",
+    "addPage": "新增页面",
+    "allPages": "全部页面",
+    "newPage": "新页面",
+    "section": "区块",
+    "addSection": "新增区块"
   },
   "fields": {
     "key": "标识",
@@ -157,8 +166,16 @@
     "wechat": "微信",
     "address": "地址",
     "hours": "开放时间",
-    "studioPhoto": "工作室照片",
-    "addPhoto": "添加照片"
+    "description": "搜索引擎描述",
+    "inMenu": "显示在菜单中",
+    "menuName": "菜单中的名称",
+    "sectionKind": "这个区块是什么",
+    "line": "这句话",
+    "heading": "标题",
+    "paragraph": "段落",
+    "addParagraph": "新增段落",
+    "paragraphNumber": "第 {{number}} 段",
+    "addPhoto": "新增照片"
   },
   "works": {
     "status": {
@@ -193,9 +210,6 @@
     "oneLineHint": "仅写一个句子，版面只为它留出一行。",
     "needsKey": "请先为导师设置标识，它会用作肖像文件名。"
   },
-  "sitePage": {
-    "photosHint": "这些照片会显示在首页宣言下方，并横向显示在关于页面。"
-  },
   "historyPage": {
     "intro": "每次发布都会追加一个版本。恢复旧版本时会将其内容再次发布为新版本，因此曾经上线的内容永远不会丢失。",
     "loading": "正在读取发布记录…",
@@ -218,11 +232,46 @@
     "response": "响应结构"
   },
   "copyPage": {
-    "intro": "每个字段都同时提供中文和英文，任一语言留空都会在保存前被发现。",
-    "paragraphs": "关于——正文段落",
-    "paragraphsHint": "两种语言需要相同数量的段落，它们会在页面上并排显示。",
-    "paragraph": "{{language}}段落",
-    "addParagraph": "添加{{language}}段落",
-    "paragraphNumber": "第 {{number}} 段"
+    "intro": "每个字段都同时提供中文和英文，任一语言留空都会在保存前被发现。"
+  },
+  "sectionKinds": {
+    "heading": "页面标题",
+    "statement": "首屏宣言",
+    "prose": "段落",
+    "gallery": "照片",
+    "works-index": "作品索引",
+    "works-grid": "作品网格",
+    "programs": "课程",
+    "mentors": "导师"
+  },
+  "sectionHints": {
+    "heading": "页面标题，放大显示在顶部。每个页面都需要页面标题或首屏宣言，且只能有一个。",
+    "statement": "一句话，居中，独占第一屏。它就是这个页面的标题，所以有宣言的页面不再需要页面标题。",
+    "prose": "正文，一次一段。",
+    "gallery": "整幅照片，一次一张，之间留出大量空白。",
+    "works-index": "所有作品，以编号和标题的形式逐行排列，鼠标悬停时显示照片。无需填写内容——它直接读取作品。",
+    "works-grid": "有独立页面的作品，以封面网格呈现。",
+    "programs": "所有课程，一屏一个。无需填写内容——它直接读取课程。",
+    "mentors": "导师，在区块占据屏幕时横向阅读。"
+  },
+  "pagePage": {
+    "order": "这里的顺序就是菜单的顺序。移动页面即可改变它在导航栏中的位置。",
+    "sectionCount": "{{count}} 个区块",
+    "sectionCount_other": "{{count}} 个区块",
+    "inMenu": "在菜单中",
+    "notInMenu": "不在菜单中",
+    "moveUp": "将 {{page}} 上移",
+    "moveDown": "将 {{page}} 下移",
+    "address": "页面地址将是 /zh/{{slug}}/。修改后已分享的链接会失效。",
+    "addressFront": "留空表示这是首页——地址为 /zh/ 与 /en/。每个网站都需要且只需要一个。",
+    "titleHint": "浏览器标签显示的文字，也是「页面标题」区块所绘制的内容。",
+    "descriptionHint": "一两句话。会显示在搜索结果的链接下方。",
+    "menuHint": "关闭后页面依然存在于它的地址上，只是不出现在导航栏中。",
+    "sectionsHint": "页面就是这些区块，自上而下。移动它们即可改变页面。",
+    "galleryHint": "按此顺序整幅显示，一次一张。",
+    "frontPageKept": "首页无法删除——它就是网站自身的地址。",
+    "removeQuestion": "要从网站中移除「{{page}}」吗？它的地址将失效，并从菜单中消失。照片仍保留在存储中。",
+    "removeIt": "移除",
+    "removePage": "移除这个页面"
   }
 }

@@ -12,7 +12,7 @@
  * the route, the entry in the document, and the card in the dev panel, in one
  * edit, with no file to remember to regenerate.
  */
-import type { ImageRef, Mentor, Program, Work } from '../../src/content/types';
+import type { Mentor, Page, Program, Work } from '../../src/content/types';
 import type { JsonSchema } from './schema';
 
 /** A path or query parameter, as both the docs and the dev panel read it. */
@@ -33,14 +33,12 @@ export interface ConnectorRequest {
   query: URLSearchParams;
 }
 
-/** The site's chrome and its studio, as a published revision carries it. */
+/** The site's chrome, as a published revision carries it. */
 export interface PublishedSite {
   name: { zh: string; en: string };
   url: string;
   locales: string[];
   localeNames: { zh: string; en: string };
-  nav: unknown[];
-  studio: ImageRef[];
   contact: unknown;
 }
 
@@ -55,6 +53,7 @@ export interface PublishedSite {
  */
 export interface ReadableBundle {
   site: PublishedSite;
+  pages: Page[];
   works: Work[];
   programs: Program[];
   mentors: Mentor[];

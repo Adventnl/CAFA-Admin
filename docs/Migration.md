@@ -7,7 +7,17 @@ This spans both repositories. CAFA-Admin becomes the backend; CAFA-Template
 becomes a frontend that gets its content from that backend instead of from files
 checked in beside its code.
 
-> **Status: implemented.** All five phases are in the code. What still needs
+> **Status: implemented, and since superseded in one place.** This document is
+> the record of that migration, and the schema it prints is the schema as it
+> stood at the end of it. Pages became content afterwards — migration
+> `0005_pages.sql` — which added the `pages`, `page_section`,
+> `section_paragraph` and `section_media` tables, dropped `site_studio`, and
+> moved a page's title, prose and section headings out of the copy table onto
+> the page that owns them. The nav went with them: it is the pages that carry a
+> `navLabel`, so §4's "the nav's labels became editable copy" now reads "the nav
+> *is* the pages". README.md § *Pages are content* is the current description.
+>
+> All five phases below are in the code. What still needs
 > hands on a Cloudflare account is the provisioning in §8 — creating the
 > database and bucket, running the seed and the upload, setting the secrets and
 > wiring the two deploy hooks. Three things ended up different from the plan as

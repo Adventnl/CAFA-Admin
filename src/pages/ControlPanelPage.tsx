@@ -115,6 +115,12 @@ export function ControlPanelPage({ editor }: ControlPanelPageProps) {
       <h3 className="panel-heading">{t('dashboard.contents')}</h3>
       <div className="tiles">
         <Tile
+          label={t('dashboard.pages')}
+          value={String(content.pages.length)}
+          note={t('dashboard.pagesNote')}
+          to="pages"
+        />
+        <Tile
           label={t('dashboard.works')}
           value={String(content.works.length)}
           note={privateWorks === 0 ? t('dashboard.allPublic') : t('dashboard.privateWorks', { count: privateWorks })}
@@ -239,7 +245,12 @@ function countPhotographs(content: ContentSet): number {
     for (const image of work.media) add(image.src);
   }
   for (const mentor of content.mentors) add(mentor.portrait.src);
-  for (const image of content.site.studio) add(image.src);
+  for (const page of content.pages) {
+    for (const section of page.sections) {
+      if (section.kind !== 'gallery') continue;
+      for (const image of section.images) add(image.src);
+    }
+  }
 
   return keys.size;
 }

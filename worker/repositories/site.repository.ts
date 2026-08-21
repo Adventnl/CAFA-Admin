@@ -1,30 +1,27 @@
 /**
- * The site row, and the studio photographs beside it.
+ * The site row.
  *
  * One row, by construction — `id INTEGER PRIMARY KEY CHECK (id = 1)`. That
  * constraint is the seam that makes multi-tenant a migration rather than a
  * rewrite, and it costs one table to leave open.
  *
- * `nav`, `locales` and `url` are not here. They are wired to the template's
+ * `locales` and `url` are not here. They are wired to the template's
  * lib/routes.ts and to the deployment, and are added when a revision is built.
+ * Nor are the studio photographs: they are a `gallery` section on the front
+ * page now (migration 0005), which is the same photographs with one owner
+ * instead of two.
  */
 import type { SiteContent } from '../../src/content/types';
-import type { SiteRow, StudioRow } from '../models/rows';
-import { imageBindings, imageRef, pair } from './mapping';
+import type { SiteRow } from '../models/rows';
+import { pair } from './mapping';
 
 export async function readSite(db: D1Database): Promise<SiteContent> {
-  const [site, studio] = await Promise.all([
-    db.prepare('SELECT * FROM site WHERE id = 1').first<SiteRow>(),
-    db.prepare('SELECT * FROM site_studio ORDER BY position').all<StudioRow>(),
-  ]);
+  const site = await db.prepare('SELECT * FROM site WHERE id = 1').first<SiteRow>();
 
   if (site === null) throw new Error('The site row is missing. Has the seed been run?');
 
   return {
     name: pair(site.name_zh, site.name_en),
-    studio: studio.results.map((row) =>
-      imageRef(row.media_key, row.alt_zh, row.alt_en, row.decorative),
-    ),
     contact: {
       email: site.contact_email,
       wechat: site.contact_wechat,
@@ -35,11 +32,11 @@ export async function readSite(db: D1Database): Promise<SiteContent> {
 }
 
 export function deleteSite(db: D1Database): D1PreparedStatement[] {
-  return [db.prepare('DELETE FROM site_studio'), db.prepare('DELETE FROM site')];
+  return [db.prepare('DELETE FROM site')];
 }
 
 export function insertSite(db: D1Database, site: SiteContent): D1PreparedStatement[] {
-  const statements: D1PreparedStatement[] = [
+  return [
     db
       .prepare(
         `INSERT INTO site (id, name_zh, name_en, contact_email, contact_wechat,
@@ -57,17 +54,4 @@ export function insertSite(db: D1Database, site: SiteContent): D1PreparedStateme
         site.contact.hours.en,
       ),
   ];
-
-  site.studio.forEach((image, at) => {
-    statements.push(
-      db
-        .prepare(
-          `INSERT INTO site_studio (position, media_key, alt_zh, alt_en, decorative)
-           VALUES (?, ?, ?, ?, ?)`,
-        )
-        .bind(at, ...imageBindings(image)),
-    );
-  });
-
-  return statements;
 }

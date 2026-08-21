@@ -22,7 +22,35 @@ export interface SiteRow {
   hours_en: string;
 }
 
-export interface StudioRow {
+export interface PageRow {
+  slug: string;
+  title_zh: string;
+  title_en: string;
+  description_zh: string;
+  description_en: string;
+  in_nav: number;
+  nav_zh: string;
+  nav_en: string;
+}
+
+export interface PageSectionRow {
+  page_slug: string;
+  position: number;
+  kind: string;
+  text_zh: string;
+  text_en: string;
+}
+
+export interface SectionParagraphRow {
+  page_slug: string;
+  section_position: number;
+  zh: string;
+  en: string;
+}
+
+export interface SectionMediaRow {
+  page_slug: string;
+  section_position: number;
   media_key: string;
   alt_zh: string;
   alt_en: string;

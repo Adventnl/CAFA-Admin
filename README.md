@@ -1,8 +1,9 @@
 # CAFA-Admin
 
 The editor and the backend for [CAFA-Template](https://github.com/Adventnl/CAFA-Template) —
-the c.a.f.a atelier site. It lets the studio add works, change text and replace
-photographs without touching code, then preview the result and publish it.
+the c.a.f.a atelier site. It lets the studio build the site's pages, add works,
+change text and replace photographs without touching code, then preview the
+result and publish it.
 
 ## How it works
 
@@ -60,14 +61,60 @@ schema, rather than discovered at build time:
 - **A private work publishes nothing.** It is listed in the index and has no
   page; its cover and photographs are dropped when a revision is built, so no
   URL for them ever reaches a browser.
-- **The nav's shape, the locales and the site URL are not editable.** They are
-  wired to the template's `lib/routes.ts` and to the deployment — the site URL
-  literally so: it is the `PRODUCTION_URL` var, stamped into each published
-  revision by `worker/domain/bundle.ts`. The nav's *labels* are editable, because they
-  are words on a screen.
+- **The locales and the site URL are not editable.** They are wired to the
+  template's `lib/routes.ts` and to the deployment — the site URL literally so:
+  it is the `PRODUCTION_URL` var, stamped into each published revision by
+  `worker/domain/bundle.ts`.
+- **A page needs exactly one heading, and the site needs exactly one front
+  page.** Both are rules about a set of rows rather than about one, so neither
+  is a column constraint: the form refuses the save and the site refuses the
+  build. A page with two headings is a broken document outline; a site with no
+  front page answers 404 at its own address.
+- **A section can only be a kind the site can draw.** The kinds are components
+  in the template — a gallery, a works index, a mentor strip — so a new one is a
+  deploy over there. How many of them a page has, in what order, and on which
+  page, is not.
 
 If a save would still produce content the site cannot build, the build fails and
 the previous deploy keeps serving. The live site cannot be broken from here.
+
+## Pages are content
+
+The site's pages are rows in this database, not files in the template. Each one
+is a slug, the words that name it, and an ordered list of **sections**; the
+template has a single route behind all of them and one component that turns a
+section list into a page.
+
+So the things that used to need a developer no longer do:
+
+| | Before | Now |
+|---|---|---|
+| A new page | a route file, a commit, a deploy | **Pages → Add a page** |
+| Deleting a page | the same, in reverse | **Remove this page** |
+| Moving the mentors above the prose | a commit | the ↑ button |
+| A page in or out of the menu | a commit | a checkbox |
+| The order of the menu | a commit | the order of this list |
+
+The eight section kinds, and what each draws:
+
+| Kind | What appears |
+|---|---|
+| Page heading | the page's own title, set large at the top |
+| Statement | one line, centred, holding the first screen |
+| Paragraphs | running text, one paragraph at a time |
+| Photographs | full-width images, one at a time |
+| Index of works | every work as a row, with the cover on hover |
+| Grid of works | the works that have a page, as covers |
+| Programmes | every programme, one screen at a time |
+| Mentors | the people, read across a pinned window |
+
+The last four take no fields: they draw a collection, so adding a mentor puts a
+face on every page that carries a mentors section. That is the same rule the
+works index always followed, applied to the rest.
+
+A **kind** is still code — it is one component in CAFA-Template, and a kind
+nothing draws would be a blank on a page. Everything about *where and how often*
+each kind appears is here.
 
 ## The two panels
 
@@ -288,11 +335,20 @@ cd ../CAFA-Template && git reset -q -- src/content && rm -rf src/content
 (`git checkout <commit> -- <path>` stages what it restores, so the last line has
 to unstage before deleting, or the next commit resurrects the files.)
 
-That should report *10 works, 4 programmes, 6 mentors, 49 copy keys, 71 images*.
+That should report *10 works, 4 programmes, 6 mentors, 4 pages, 32 copy keys,
+71 images*, and it will name one section it left out — the about page's grid of
+works, whose heading arrived in migration 0003, after the snapshot it reads.
+Anything else the snapshot predates is added in the admin afterwards.
 
 The importer emits rather than executes, so both artefacts can be read before
 they are run. Both are re-runnable: the seed clears the tables it fills, and an
 object put over an existing key replaces it.
+
+The one table it does not clear is `copy`. A copy *key* exists because the
+template reads it by name, so keys arrive by migration and this snapshot is
+older than some of them; clearing the table would delete keys it has no values
+for and leave the site unbuildable. It replaces the values it has and leaves the
+rest alone.
 
 **Only after `upload.sh` has succeeded** is it safe to delete `media-source/`
 from the template repository — until then it is the only copy of the
@@ -445,8 +501,12 @@ migrations/
   0002_…url_is_…config.sql  the site's origin stops being content
   0003_template_copy_sync…  the copy keys follow the template's Dictionary
   0004_media_tint.sql       a photograph's dominant hue, beside its dimensions
+  0005_pages.sql            pages become content: the schema, and the four the
+                            site already had, lifted out of the copy table
 scripts/
-  import.mjs                the one-shot move from files to database
+  import.mjs                the one-shot move from files to database, pages
+                            included — 0005 does the same for a database that
+                            was seeded before pages existed
   media-delivery.mjs        does the zone transform, and does the bucket answer
   set-password.mjs          a password in, the ADMIN_PASSWORD_HASH line out
 
@@ -477,7 +537,7 @@ worker/
 
   repositories/             D1: rows in, domain objects out
     content.repository.ts   the unit of work — one batch, one transaction
-    site · works · programs · mentors · copy    one aggregate each
+    site · pages · works · programs · mentors · copy    one aggregate each
     media · revision
     mapping.ts              paired columns ⇄ LocalisedText, four columns ⇄ ImageRef
 
@@ -497,7 +557,7 @@ src/
     http.ts                 unwraps the envelope; nothing else knows about fetch
     session · content · media · publish
     connectors.ts           reads api.json — the dev panel keeps no list of its own
-  pages/                    one per route: the control panel, five editors,
+  pages/                    one per route: the control panel, six editors,
                             history and the dev panel, plus sign-in
   ui/                       the layout, the form vocabulary, the publish bar
   routes.ts                 the route table, and the whole of the client router
@@ -541,9 +601,9 @@ the bucket, which costs nothing at this volume and is the deliberate trade.
 `src/content/types.ts` mirrors the template's `src/lib/types.ts` rather than
 importing it, because the two repositories deploy separately and a shared
 package for six interfaces would cost more than it saves. It diverges in two
-places on purpose — `SiteContent` has no `nav`, `locales` or `localeNames`, and
-`Dictionary` has `nav` and `localeName` — both because the admin's types should
-describe what the admin can actually change. `worker/domain/bundle.ts` reconciles the
+places on purpose — `SiteContent` has no `locales` or `localeNames`, and
+`Dictionary` has `localeName` — both because the admin's types should describe
+what the admin can actually change. `worker/domain/bundle.ts` reconciles the
 two when it builds a revision. The copy cannot drift dangerously: the template
 re-parses every field at build time, so a mismatch fails the build and never
 reaches the live site.

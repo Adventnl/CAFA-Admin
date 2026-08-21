@@ -1,5 +1,12 @@
 /**
- * The site's own words — everything that is not a work, a programme or a person.
+ * The words on the chrome — everything that is not a page, a work, a programme
+ * or a person.
+ *
+ * A page's title, its prose and the headings over its sections are not here any
+ * more: they belong to a page, which can be deleted, so they are fields on the
+ * page record and are edited in Pages. What is left outlives every page — the
+ * pager on a work, the labels a screen reader hears, the contact card, the
+ * footer.
  *
  * The dictionary's *keys* are structure: the template reads them by name, so a
  * renamed key is a broken build and a missing one is a blank on the page. So
@@ -11,7 +18,7 @@ import type { Dictionary, Locale } from '../content/types';
 import { LOCALES } from '../content/types';
 import { useTranslation } from 'react-i18next';
 import type { Editor } from '../useEditor';
-import { moved, Repeatable, TextField } from '../ui/fields';
+import { TextField } from '../ui/fields';
 
 interface CopyField {
   label: string;
@@ -29,57 +36,9 @@ interface CopyGroup {
 
 const GROUPS: CopyGroup[] = [
   {
-    title: 'Home',
+    title: 'A work’s three states',
+    note: 'The words the index and a work’s own page use for its status.',
     fields: [
-      {
-        label: 'Statement',
-        multiline: true,
-        hint: 'The one sentence the home page is built around.',
-        read: (d) => d.home.statement,
-        write: (d, v) => ({ ...d, home: { ...d.home, statement: v } }),
-      },
-    ],
-  },
-  {
-    title: 'About',
-    fields: [
-      {
-        label: 'Page title',
-        read: (d) => d.about.title,
-        write: (d, v) => ({ ...d, about: { ...d.about, title: v } }),
-      },
-      {
-        label: 'Description for search engines',
-        multiline: true,
-        read: (d) => d.about.description,
-        write: (d, v) => ({ ...d, about: { ...d.about, description: v } }),
-      },
-      {
-        label: 'Heading above the mentors',
-        read: (d) => d.about.mentorsTitle,
-        write: (d, v) => ({ ...d, about: { ...d.about, mentorsTitle: v } }),
-      },
-      {
-        label: 'Heading above the works',
-        read: (d) => d.about.worksTitle,
-        write: (d, v) => ({ ...d, about: { ...d.about, worksTitle: v } }),
-      },
-    ],
-  },
-  {
-    title: 'Works',
-    fields: [
-      {
-        label: 'Page title',
-        read: (d) => d.works.title,
-        write: (d, v) => ({ ...d, works: { ...d.works, title: v } }),
-      },
-      {
-        label: 'Description for search engines',
-        multiline: true,
-        read: (d) => d.works.description,
-        write: (d, v) => ({ ...d, works: { ...d.works, description: v } }),
-      },
       {
         label: 'Status word — completed',
         read: (d) => d.works.status.completed,
@@ -142,30 +101,14 @@ const GROUPS: CopyGroup[] = [
     ],
   },
   {
-    title: 'Programmes page',
-    fields: [
-      {
-        label: 'Page title',
-        read: (d) => d.programs.title,
-        write: (d, v) => ({ ...d, programs: { ...d.programs, title: v } }),
-      },
-      {
-        label: 'Description for search engines',
-        multiline: true,
-        read: (d) => d.programs.description,
-        write: (d, v) => ({ ...d, programs: { ...d.programs, description: v } }),
-      },
-      {
-        label: 'Introduction',
-        multiline: true,
-        read: (d) => d.programs.intro,
-        write: (d, v) => ({ ...d, programs: { ...d.programs, intro: v } }),
-      },
-    ],
-  },
-  {
     title: 'Contact card',
     fields: [
+      {
+        label: 'The word in the menu that opens it',
+        hint: 'Contact is the one menu item that is not a page — it opens the card over whichever page the reader is on.',
+        read: (d) => d.contact.nav,
+        write: (d, v) => ({ ...d, contact: { ...d.contact, nav: v } }),
+      },
       {
         label: 'Card title',
         read: (d) => d.contact.title,
@@ -358,41 +301,6 @@ export function CopyPage({ editor }: CopyPageProps) {
         </section>
       ))}
 
-      <section className="copy-group">
-        <h3 className="copy-group-title">{t('copyPage.paragraphs')}</h3>
-        <p className="section-note">
-          {t('copyPage.paragraphsHint')}
-        </p>
-
-        {LOCALES.map((locale) => {
-          const dictionary = editor.content[locale];
-          const body = dictionary.about.body;
-          const writeBody = (next: string[]) =>
-            set(locale, { ...dictionary, about: { ...dictionary.about, body: next } });
-
-          return (
-            <Repeatable
-              key={locale}
-              label={t('copyPage.paragraph', { language: LOCALE_NAMES[locale] })}
-              count={body.length}
-              addLabel={t('copyPage.addParagraph', { language: LOCALE_NAMES[locale] })}
-              onAdd={() => writeBody([...body, ''])}
-              onRemove={(at) => writeBody(body.filter((_, position) => position !== at))}
-              onMove={(at, to) => writeBody(moved(body, at, to))}
-              renderItem={(at) => (
-                <TextField
-                  label={t('copyPage.paragraphNumber', { number: at + 1 })}
-                  multiline
-                  value={body[at] ?? ''}
-                  onChange={(value) =>
-                    writeBody(body.map((existing, position) => (position === at ? value : existing)))
-                  }
-                />
-              )}
-            />
-          );
-        })}
-      </section>
     </section>
   );
 }

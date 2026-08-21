@@ -16,6 +16,12 @@
  * Image dimensions come from the file headers rather than from sharp. It is
  * forty lines against a native dependency this repository would otherwise not
  * have, for a script that runs approximately once.
+ *
+ * The JSON predates pages, so the four the site had are composed here out of
+ * the dictionaries that used to hold their words — the same mapping migration
+ * 0005 performs on a database that was already seeded, done here because a
+ * fresh setup applies the migrations to an empty database, where 0005 has
+ * nothing to read and correctly does nothing.
  */
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -159,6 +165,35 @@ function requireMedia(key, where) {
   return key;
 }
 
+/*
+ * The dictionaries, flattened to the dotted paths the copy table stores and the
+ * pages read their words from, plus the two pieces of chrome that lived in
+ * site.json rather than in a dictionary.
+ *
+ * `contact.nav` is the word that opens the contact card. It came from the nav
+ * list, because contact used to be a nav item like any other; it is the one
+ * item that is not a page — it pins a card over whichever page you are on — so
+ * it stays copy while the rest of the nav became a column on `pages`.
+ */
+const zhFlat = new Map();
+const enFlat = new Map();
+flatten(zh, [], zhFlat);
+flatten(en, [], enFlat);
+
+const navLabels = new Map(
+  site.nav.flatMap((entry) => (entry.route === undefined ? [] : [[entry.route, entry.label]])),
+);
+
+const contactNav = site.nav.find((entry) => entry.opens === 'contact');
+if (contactNav === undefined) throw new Error('site.json has no contact nav item');
+zhFlat.set('contact.nav', contactNav.label.zh);
+enFlat.set('contact.nav', contactNav.label.en);
+zhFlat.set('localeName', site.localeNames.zh);
+enFlat.set('localeName', site.localeNames.en);
+
+/** The about page's paragraphs, whose count decides how many rows it emits. */
+const about = zh.about;
+
 const lines = [];
 const say = (line = '') => lines.push(line);
 
@@ -168,11 +203,13 @@ say();
 say('DELETE FROM work_media;');
 say('DELETE FROM work_credit;');
 say('DELETE FROM work_discipline;');
-say('DELETE FROM site_studio;');
+say('DELETE FROM section_media;');
+say('DELETE FROM section_paragraph;');
+say('DELETE FROM page_section;');
+say('DELETE FROM pages;');
 say('DELETE FROM works;');
 say('DELETE FROM programs;');
 say('DELETE FROM mentors;');
-say('DELETE FROM copy;');
 say('DELETE FROM site;');
 say('DELETE FROM media;');
 say();
@@ -197,16 +234,143 @@ say(
 );
 say();
 
-say('-- studio photographs -------------------------------------------------');
-site.studio.forEach((image, at) => {
-  const c = imageColumns(image, `site.studio[${at}]`);
-  requireMedia(c.key, `site.studio[${at}]`);
+say('-- pages --------------------------------------------------------------');
+/*
+ * The four pages the site had when they were route files, as the rows that
+ * replaced them. This is the same mapping migration 0005 performs against a
+ * database that was already seeded; it is here as well because a *fresh* setup
+ * runs the migrations against an empty database, where 0005 has nothing to read
+ * and correctly does nothing.
+ *
+ * Each entry names where its words come from — the dictionaries, which is where
+ * they lived when a page's title was UI copy — and the sections it is made of.
+ * `text` is a dotted dictionary path; a section carries whichever of `text`,
+ * `paragraphs` and `images` its kind has.
+ */
+const pages = [
+  {
+    slug: '',
+    title: 'meta.title',
+    description: 'meta.description',
+    nav: null,
+    sections: [
+      { kind: 'statement', text: 'home.statement' },
+      { kind: 'gallery', images: site.studio },
+    ],
+  },
+  {
+    slug: 'works',
+    title: 'works.title',
+    description: 'works.description',
+    nav: 'works',
+    sections: [{ kind: 'heading' }, { kind: 'works-index' }],
+  },
+  {
+    slug: 'programs',
+    title: 'programs.title',
+    description: 'programs.description',
+    nav: 'programs',
+    sections: [
+      { kind: 'heading' },
+      { kind: 'prose', paragraphs: ['programs.intro'] },
+      { kind: 'programs' },
+    ],
+  },
+  {
+    slug: 'about',
+    title: 'about.title',
+    description: 'about.description',
+    nav: 'about',
+    sections: [
+      { kind: 'heading' },
+      { kind: 'prose', paragraphs: about.body.map((_, at) => `about.body.${at}`) },
+      { kind: 'mentors', text: 'about.mentorsTitle' },
+      { kind: 'works-grid', text: 'about.worksTitle' },
+    ],
+  },
+];
+
+/**
+ * A dotted dictionary path, in both languages, or undefined where the source
+ * does not have it.
+ *
+ * Undefined is a real answer rather than a failure, because the JSON this reads
+ * is a snapshot: a section whose words are not in it is a section that page did
+ * not have when the snapshot was taken. The importer composes what the source
+ * actually describes and says at the end what it left out; a page that ends up
+ * with no heading at all still fails, at the site's build gate, loudly.
+ */
+function words(path) {
+  const zhText = zhFlat.get(path);
+  const enText = enFlat.get(path);
+  if (zhText === undefined || enText === undefined) return undefined;
+  return { zh: zhText, en: enText };
+}
+
+/** A page's own words are not optional: a page with no title is a mistake. */
+function requireWords(path) {
+  const found = words(path);
+  if (found === undefined) throw new Error(`the dictionaries are missing "${path}"`);
+  return found;
+}
+
+const skipped = [];
+
+pages.forEach((page, at) => {
+  const title = requireWords(page.title);
+  const description = requireWords(page.description);
+  const nav = page.nav === null ? null : navLabels.get(page.nav);
+  if (page.nav !== null && nav === undefined) {
+    throw new Error(`site.json has no nav item called "${page.nav}"`);
+  }
+
   say(
-    `INSERT INTO site_studio (position, media_key, alt_zh, alt_en, decorative)\n` +
-      `VALUES (${n(at)}, ${q(c.key)}, ${q(c.altZh)}, ${q(c.altEn)}, ${n(c.decorative)});`,
+    `INSERT INTO pages (slug, position, title_zh, title_en, description_zh, description_en,\n` +
+      `                   in_nav, nav_zh, nav_en)\n` +
+      `VALUES (${q(page.slug)}, ${n(at)}, ${q(title.zh)}, ${q(title.en)}, ` +
+      `${q(description.zh)}, ${q(description.en)},\n` +
+      `        ${n(nav === null ? 0 : 1)}, ${q(nav?.zh ?? '')}, ${q(nav?.en ?? '')});`,
   );
+
+  // Position is the section's identity, so it counts the sections actually
+  // emitted rather than the ones offered: a skipped one must not leave a gap.
+  let position = 0;
+  for (const section of page.sections) {
+    const text = section.text === undefined ? { zh: '', en: '' } : words(section.text);
+    if (text === undefined) {
+      skipped.push(`${page.slug || '/'} — ${section.kind} (no "${section.text}")`);
+      continue;
+    }
+
+    say(
+      `INSERT INTO page_section (page_slug, position, kind, text_zh, text_en) ` +
+        `VALUES (${q(page.slug)}, ${n(position)}, ${q(section.kind)}, ${q(text.zh)}, ${q(text.en)});`,
+    );
+
+    for (const [ordinal, paragraph] of (section.paragraphs ?? []).entries()) {
+      const line = requireWords(paragraph);
+      say(
+        `INSERT INTO section_paragraph (page_slug, section_position, position, zh, en) ` +
+          `VALUES (${q(page.slug)}, ${n(position)}, ${n(ordinal)}, ${q(line.zh)}, ${q(line.en)});`,
+      );
+    }
+
+    for (const [ordinal, image] of (section.images ?? []).entries()) {
+      const where = `pages.${page.slug || 'home'}.images[${ordinal}]`;
+      const c = imageColumns(image, where);
+      requireMedia(c.key, where);
+      say(
+        `INSERT INTO section_media (page_slug, section_position, position, media_key, ` +
+          `alt_zh, alt_en, decorative) ` +
+          `VALUES (${q(page.slug)}, ${n(position)}, ${n(ordinal)}, ${q(c.key)}, ` +
+          `${q(c.altZh)}, ${q(c.altEn)}, ${n(c.decorative)});`,
+      );
+    }
+
+    position += 1;
+  }
+  say();
 });
-say();
 
 say('-- works --------------------------------------------------------------');
 works.forEach((work, at) => {
@@ -275,31 +439,57 @@ mentors.forEach((mentor, at) => {
 say();
 
 say('-- UI copy ------------------------------------------------------------');
-const zhFlat = new Map();
-const enFlat = new Map();
-flatten(zh, [], zhFlat);
-flatten(en, [], enFlat);
 
 /*
- * The chrome copy, which site.json carried and the dictionaries did not.
+ * What is left in the copy table is the chrome: the words that outlive every
+ * page. A page's own title, its prose and the headings over its sections are
+ * fields on the page rows above, because they belong to a page that can be
+ * deleted — so those dictionary paths are read by the pages and dropped here.
  *
- * The nav's shape is code — worker/domain/bundle.ts owns the order and what each item
- * points at — but its labels are words on a screen, so they become copy the
- * studio can edit. The key is the route or panel name, which is what bundle.ts
- * looks them up by. `localeName` is what a language calls itself in the switch.
+ * `localeName` is what a language calls itself in the switch, and `contact.nav`
+ * is the word that opens the contact card. Both are chrome, and neither was in
+ * a dictionary: they came from site.json, so they are added rather than kept.
  */
-for (const entry of site.nav) {
-  const key = `nav.${entry.route ?? entry.opens}`;
-  zhFlat.set(key, entry.label.zh);
-  enFlat.set(key, entry.label.en);
-}
-zhFlat.set('localeName', site.localeNames.zh);
-enFlat.set('localeName', site.localeNames.en);
+const MOVED_TO_PAGES = [
+  // Retired before pages existed: migration 0003 deleted both, because the nav
+  // already carried the works link and the studio photographs left the about
+  // page. The snapshot this reads still has them.
+  'home.worksLink',
+  'about.studioTitle',
 
-for (const key of [...zhFlat.keys()].sort()) {
+  'home.statement',
+  'works.title',
+  'works.description',
+  'programs.title',
+  'programs.description',
+  'programs.intro',
+  'about.title',
+  'about.description',
+  'about.mentorsTitle',
+  'about.worksTitle',
+];
+
+const chrome = (map) =>
+  [...map.keys()].filter(
+    (key) => !MOVED_TO_PAGES.includes(key) && !key.startsWith('about.body.'),
+  );
+
+/*
+ * Replace rather than clear-and-fill, and this is the one table that works that
+ * way. Copy *keys* are schema — one exists because the template reads it by
+ * name — so they arrive by migration, beside the code that reads them. The
+ * snapshot this script reads is older than some of those migrations, so
+ * clearing the table first would delete keys it has no values for and leave the
+ * site unbuildable. Values are what an import supplies; keys are not its to
+ * remove.
+ */
+for (const key of chrome(zhFlat).sort()) {
   const english = enFlat.get(key);
   if (english === undefined) throw new Error(`dictionaries/en.json is missing "${key}"`);
-  say(`INSERT INTO copy (key, zh, en) VALUES (${q(key)}, ${q(zhFlat.get(key))}, ${q(english)});`);
+  say(
+    `INSERT OR REPLACE INTO copy (key, zh, en) ` +
+      `VALUES (${q(key)}, ${q(zhFlat.get(key))}, ${q(english)});`,
+  );
 }
 for (const key of enFlat.keys()) {
   if (!zhFlat.has(key)) throw new Error(`dictionaries/zh.json is missing "${key}"`);
@@ -326,7 +516,10 @@ const totalBytes = [...sizes.values()].reduce((sum, entry) => sum + entry.bytes,
 console.info(
   [
     `import: ${works.length} works, ${programs.length} programmes, ${mentors.length} mentors`,
-    `        ${zhFlat.size} copy keys, ${mediaKeys.length} images (${(totalBytes / 1e6).toFixed(1)} MB)`,
+    `        ${pages.length} pages, ${chrome(zhFlat).length} copy keys, ` +
+      `${mediaKeys.length} images (${(totalBytes / 1e6).toFixed(1)} MB)`,
+    '',
+    ...(skipped.length === 0 ? [] : ['', 'Sections the source had no words for, left out:', ...skipped.map((line) => `  ${line}`)]),
     '',
     'Then, once the database and bucket exist:',
     '  npx wrangler d1 execute cafa-content --remote --file import/seed.sql',

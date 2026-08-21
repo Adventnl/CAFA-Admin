@@ -1,17 +1,19 @@
 /**
- * The studio itself: what it is called, how to reach it, and the photographs
- * the home page carries below the fold.
+ * The studio itself: what it is called and how to reach it.
  *
- * `nav`, `locales` and `url` are deliberately not here. They are wired to
- * lib/routes and to the deployment, and changing one of them is a code change
- * with a deploy behind it — not something to expose on a form that says "save".
+ * `locales` and `url` are deliberately not here. They are wired to lib/routes
+ * and to the deployment, and changing one of them is a code change with a
+ * deploy behind it — not something to expose on a form that says "save".
+ *
+ * The studio photographs are not here either, and that is the change rather
+ * than an omission: they are a `gallery` section on the front page now, so they
+ * are added, reordered and removed in Pages beside everything else on it. One
+ * list, one owner.
  */
-import { emptyLocalised, type ImageRef, type SiteContent } from '../content/types';
+import type { SiteContent } from '../content/types';
 import { useTranslation } from 'react-i18next';
-import { nextMediaName } from '../images';
 import type { Editor } from '../useEditor';
-import { LocalisedField, moved, Repeatable, TextField } from '../ui/fields';
-import { ImageField } from '../ui/ImageField';
+import { LocalisedField, TextField } from '../ui/fields';
 
 interface SitePageProps {
   editor: Editor;
@@ -26,8 +28,6 @@ export function SitePage({ editor }: SitePageProps) {
 
   const setContact = (patch: Partial<SiteContent['contact']>) =>
     set('contact', { ...site.contact, ...patch });
-
-  const blankStudio = (): ImageRef => ({ src: '', alt: emptyLocalised() });
 
   return (
     <section>
@@ -59,47 +59,6 @@ export function SitePage({ editor }: SitePageProps) {
         onChange={(hours) => setContact({ hours })}
       />
 
-      <Repeatable
-        label={t('fields.studioPhoto')}
-        count={site.studio.length}
-        addLabel={t('fields.addPhoto')}
-        hint={t('sitePage.photosHint')}
-        onAdd={() => set('studio', [...site.studio, blankStudio()])}
-        onRemove={(at) =>
-          set(
-            'studio',
-            site.studio.filter((_, position) => position !== at),
-          )
-        }
-        onMove={(at, to) => set('studio', moved(site.studio, at, to))}
-        renderItem={(at) => {
-          const image = site.studio[at];
-          if (image === undefined) return null;
-          return (
-            <ImageField
-              label={`${t('fields.studioPhoto')} ${at + 1}`}
-              value={image}
-              onChange={(value) =>
-                set(
-                  'studio',
-                  site.studio.map((existing, position) => (position === at ? value : existing)),
-                )
-              }
-              folder="studio"
-              name={
-                image.src === ''
-                  ? nextMediaName(
-                      site.studio.map((entry) => entry.src),
-                      '',
-                    )
-                  : (image.src.split('/').pop() ?? '').replace(/\.[^.]+$/, '')
-              }
-              mediaUrl={editor.mediaUrl}
-              onUpload={editor.putMedia}
-            />
-          );
-        }}
-      />
     </section>
   );
 }
