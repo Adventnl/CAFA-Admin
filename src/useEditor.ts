@@ -12,13 +12,15 @@
  * can never name a photograph that is not there.
  */
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { contentService } from './services/content';
 import { ApiError } from './services/http';
 import { mediaService } from './services/media';
-import { checkContent, type Problem } from './content/validate';
+import { checkContent, checkImagesInStorage, type Problem } from './content/validate';
 import type { ContentSet, MediaInfo } from './content/types';
 import { prepareImage } from './images';
+import { useSay } from './ui/say';
 
 export interface Editor {
   content: ContentSet;
@@ -37,6 +39,8 @@ export interface Editor {
 }
 
 export function useEditor(initial: ContentSet, initialMedia: MediaInfo[]): Editor {
+  const { t } = useTranslation();
+  const say = useSay();
   const [content, setContent] = useState(initial);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -67,7 +71,16 @@ export function useEditor(initial: ContentSet, initialMedia: MediaInfo[]): Edito
 
   const mediaUrl = useCallback((key: string) => mediaService.url(key, version), [version]);
 
-  const problems = useMemo(() => checkContent(content), [content]);
+  /*
+   * Both gates, so the banner says the same thing the Worker would. `version`
+   * rather than `known` in the dependencies: the set is a ref, so it is the
+   * upload counter beside it that tells React a photograph has arrived and the
+   * complaint about it can go away.
+   */
+  const problems = useMemo(
+    () => [...checkContent(content), ...checkImagesInStorage(content, known.current)],
+    [content, version],
+  );
 
   const save = useCallback(async (): Promise<boolean> => {
     if (!dirty || problems.length > 0) return false;
@@ -81,18 +94,19 @@ export function useEditor(initial: ContentSet, initialMedia: MediaInfo[]): Edito
     } catch (failure) {
       // A 422 means the server's copy of the rules caught something the form's
       // copy did not, which is a bug worth seeing rather than a generic failure.
-      setError(
-        failure instanceof ApiError && failure.problems !== undefined
-          ? `${failure.message} (${failure.problems[0]?.label ?? 'unknown field'})`
-          : failure instanceof Error
-            ? failure.message
-            : 'The save failed.',
-      );
+      // The field it names travels as a phrase, so it is said here rather than
+      // shown as the key it arrived as.
+      const field = failure instanceof ApiError ? failure.problems?.[0]?.label : undefined;
+      if (failure instanceof Error) {
+        setError(field === undefined ? failure.message : `${failure.message} (${say(field)})`);
+      } else {
+        setError(t('publish.saveFailed'));
+      }
       return false;
     } finally {
       setSaving(false);
     }
-  }, [content, dirty, problems.length]);
+  }, [content, dirty, problems.length, say, t]);
 
   return {
     content,

@@ -3,7 +3,8 @@
     "name": "c.a.f.a atelier",
     "editor": "工作室编辑器",
     "loading": "正在载入…",
-    "loadingSite": "正在载入网站…"
+    "loadingSite": "正在载入网站…",
+    "unreachable": "无法连接到站点。"
   },
   "nav": {
     "label": "工作区",
@@ -49,7 +50,8 @@
     "saveFirst": "请先保存最新更改，再预览或发布。",
     "stepSave": "1. 保存",
     "stepPreview": "2. 预览",
-    "stepPublish": "3. 发布"
+    "stepPublish": "3. 发布",
+    "saveFailed": "保存失败。"
   },
   "signin": {
     "intro": "登录后编辑网站。",
@@ -117,7 +119,8 @@
     "historyValue": "仅追加",
     "historyNote": "保留所有曾经上线的版本，也可以从这里恢复。",
     "pages": "页面",
-    "pagesNote": "整个网站。新增一个就是一个网址。"
+    "pagesNote": "整个网站。新增一个就是一个网址。",
+    "stateFailed": "无法读取网站状态。"
   },
   "pages": {
     "works": "作品",
@@ -175,7 +178,8 @@
     "paragraph": "段落",
     "addParagraph": "新增段落",
     "paragraphNumber": "第 {{number}} 段",
-    "addPhoto": "新增照片"
+    "addPhoto": "新增照片",
+    "uploadFailed": "这张图片未能上传。"
   },
   "works": {
     "status": {
@@ -218,7 +222,10 @@
     "question": "再次发布版本 {{revision}} 吗？它将成为最新版本，并重新生成线上网站。",
     "dirtyWarning": "你有未保存的编辑。它们会保留在草稿中；在你再次保存并发布前，草稿会落后于线上网站。",
     "restoring": "正在恢复…",
-    "restoreIt": "确认恢复"
+    "restoreIt": "确认恢复",
+    "readFailed": "无法读取发布记录。",
+    "restoreFailed": "恢复失败。",
+    "restored": "版本 {{from}} 正在以版本 {{to}} 重新发布。线上网站会在一两分钟内更新。"
   },
   "devPage": {
     "loading": "正在读取 API 文档…",
@@ -229,7 +236,9 @@
     "connectors_other": "{{count}} 个接口",
     "send": "发送请求",
     "sending": "请求中…",
-    "response": "响应结构"
+    "response": "响应结构",
+    "documentFailed": "无法读取 API 文档。",
+    "requestFailed": "请求失败。"
   },
   "copyPage": {
     "intro": "每个字段都同时提供中文和英文，任一语言留空都会在保存前被发现。"
@@ -273,5 +282,47 @@
     "removeQuestion": "要从网站中移除「{{page}}」吗？它的地址将失效，并从菜单中消失。照片仍保留在存储中。",
     "removeIt": "移除",
     "removePage": "移除这个页面"
+  },
+  "problems": {
+    "title": "保存前需要修正 {{count}} 处",
+    "title_other": "保存前需要修正 {{count}} 处",
+    "more": "……另有 {{count}} 处。",
+    "record": {
+      "frontPage": "首页"
+    },
+    "locale": {
+      "zh": "中文",
+      "en": "English"
+    },
+    "label": {
+      "inLocale": "{{field}}（{{locale}}）",
+      "imageFile": "{{field}}的图片文件",
+      "imageAlt": "{{field}}的图片说明",
+      "sections": "区块",
+      "section": "第 {{number}} 个区块",
+      "sectionLine": "第 {{number}} 个区块的文字",
+      "sectionHeading": "第 {{number}} 个区块的标题",
+      "sectionParagraph": "第 {{number}} 个区块的第 {{position}} 段",
+      "sectionPhotograph": "第 {{number}} 个区块的第 {{position}} 张照片",
+      "creditRole": "第 {{number}} 位参与者的角色",
+      "creditName": "第 {{number}} 位参与者的姓名",
+      "siteText": "网站文字——{{trail}}"
+    },
+    "message": {
+      "empty": "尚未填写",
+      "slugChars": "只能使用小写字母、数字和单个连字符",
+      "needsHeading": "需要一个页面标题或一句陈述",
+      "tooManyHeadings": "有一个以上的页面标题或陈述——每页只能有一个",
+      "unknownKind": "是网站无法绘制的类型",
+      "needsParagraph": "至少需要一个段落",
+      "needsPhotograph": "至少需要一张照片",
+      "wholeNumber": "必须是整数",
+      "notAStatus": "不是这三种状态之一",
+      "needsEntry": "至少需要一项",
+      "needsFrontPage": "需要一个首页——网页地址留空的那一个",
+      "duplicatePage": "被多个页面使用（“{{slug}}”）",
+      "duplicateWork": "被多个作品使用（“{{slug}}”）",
+      "notInStorage": "指向了不在存储中的照片（{{file}}）——请重新上传，或删除这张图片"
+    }
   }
 }

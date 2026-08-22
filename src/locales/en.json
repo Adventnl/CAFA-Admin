@@ -3,7 +3,8 @@
     "name": "c.a.f.a atelier",
     "editor": "Studio editor",
     "loading": "Loading…",
-    "loadingSite": "Loading the site…"
+    "loadingSite": "Loading the site…",
+    "unreachable": "Could not reach the site."
   },
   "nav": {
     "label": "Workspace",
@@ -49,7 +50,8 @@
     "saveFirst": "Save the newest edits before previewing or publishing.",
     "stepSave": "1. Save",
     "stepPreview": "2. Preview",
-    "stepPublish": "3. Publish"
+    "stepPublish": "3. Publish",
+    "saveFailed": "The save failed."
   },
   "signin": {
     "intro": "Sign in to edit the site.",
@@ -117,7 +119,8 @@
     "historyValue": "Append-only",
     "historyNote": "Every revision that was ever live, and the way back to one.",
     "pages": "Pages",
-    "pagesNote": "The whole site. Add one and it becomes a URL."
+    "pagesNote": "The whole site. Add one and it becomes a URL.",
+    "stateFailed": "The site’s state could not be read."
   },
   "pages": {
     "works": "Works",
@@ -175,7 +178,8 @@
     "paragraph": "Paragraph",
     "addParagraph": "Add a paragraph",
     "paragraphNumber": "Paragraph {{number}}",
-    "addPhoto": "Add a photograph"
+    "addPhoto": "Add a photograph",
+    "uploadFailed": "That image could not be uploaded."
   },
   "works": {
     "status": {
@@ -218,7 +222,10 @@
     "question": "Publish revision {{revision}} again? It becomes the newest revision and the live site rebuilds.",
     "dirtyWarning": "You have unsaved edits. They stay in the draft and will be behind the live site until you save and publish again.",
     "restoring": "Restoring…",
-    "restoreIt": "Restore it"
+    "restoreIt": "Restore it",
+    "readFailed": "The history could not be read.",
+    "restoreFailed": "The restore failed.",
+    "restored": "Revision {{from}} is being published again as revision {{to}}. The live site updates in a minute or two."
   },
   "devPage": {
     "loading": "Reading the API document…",
@@ -229,7 +236,9 @@
     "connectors_other": "{{count}} connectors",
     "send": "Send request",
     "sending": "Asking…",
-    "response": "Response shape"
+    "response": "Response shape",
+    "documentFailed": "The API document could not be read.",
+    "requestFailed": "The request failed."
   },
   "copyPage": {
     "intro": "Every field exists in both languages. A blank in either is caught before saving."
@@ -273,5 +282,47 @@
     "removeQuestion": "Remove {{page}} from the site? Its address stops working and it leaves the menu. Photographs stay in storage.",
     "removeIt": "Remove it",
     "removePage": "Remove this page"
+  },
+  "problems": {
+    "title": "{{count}} thing to fix before this can be saved",
+    "title_other": "{{count}} things to fix before this can be saved",
+    "more": "…and {{count}} more.",
+    "record": {
+      "frontPage": "front page"
+    },
+    "locale": {
+      "zh": "Chinese",
+      "en": "English"
+    },
+    "label": {
+      "inLocale": "{{field}} ({{locale}})",
+      "imageFile": "{{field}} file",
+      "imageAlt": "{{field}} description",
+      "sections": "Sections",
+      "section": "Section {{number}}",
+      "sectionLine": "Section {{number}} line",
+      "sectionHeading": "Section {{number}} heading",
+      "sectionParagraph": "Section {{number}} paragraph {{position}}",
+      "sectionPhotograph": "Section {{number}} photograph {{position}}",
+      "creditRole": "Credit {{number}} role",
+      "creditName": "Credit {{number}} name",
+      "siteText": "Site text — {{trail}}"
+    },
+    "message": {
+      "empty": "is empty",
+      "slugChars": "may only use lowercase letters, numbers and single hyphens",
+      "needsHeading": "needs a heading or a statement",
+      "tooManyHeadings": "has more than one heading or statement — a page may have one",
+      "unknownKind": "is a kind the site cannot draw",
+      "needsParagraph": "needs at least one paragraph",
+      "needsPhotograph": "needs at least one photograph",
+      "wholeNumber": "must be a whole number",
+      "notAStatus": "is not one of the three states",
+      "needsEntry": "needs at least one entry",
+      "needsFrontPage": "need one front page — the one whose web address is left blank",
+      "duplicatePage": "is used by more than one page (\"{{slug}}\")",
+      "duplicateWork": "is used by more than one work (\"{{slug}}\")",
+      "notInStorage": "names a photograph that is not in storage ({{file}}) — upload it again, or remove the image"
+    }
   }
 }

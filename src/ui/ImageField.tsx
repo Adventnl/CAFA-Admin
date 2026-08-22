@@ -52,7 +52,7 @@ export function ImageField({
       await onUpload(key, file);
       onChange({ ...value, src: key });
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : 'That image could not be uploaded.');
+      setFailure(error instanceof Error ? error.message : t('fields.uploadFailed'));
     } finally {
       setBusy(false);
     }

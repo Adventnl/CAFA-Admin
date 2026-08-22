@@ -37,7 +37,7 @@ export function ControlPanelPage({ editor }: ControlPanelPageProps) {
       try {
         setStatus(await publishService.status());
       } catch (error) {
-        setFailure(error instanceof Error ? error.message : 'The site’s state could not be read.');
+        setFailure(error instanceof Error ? error.message : t('dashboard.stateFailed'));
       }
     })();
   }, []);

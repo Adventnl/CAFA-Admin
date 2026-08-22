@@ -12,7 +12,7 @@
  */
 import type { ContentSet } from '../../src/content/types';
 import type { ContentResponse } from '../models/dtos/content.dtos';
-import { checkContent } from '../../src/content/validate';
+import { checkContent, checkImagesInStorage } from '../../src/content/validate';
 import { readContent, writeContent } from '../repositories/content.repository';
 import { readMedia } from '../repositories/media.repository';
 import { ApiException } from '../shared/api-exception';
@@ -30,7 +30,15 @@ export class ContentService {
   }
 
   async save(content: ContentSet): Promise<void> {
-    const problems = checkContent(content);
+    // Two checks, because they need different things. The rules are pure and
+    // run identically in the form; whether a photograph is in the bucket is a
+    // question only the database can answer, and asking it here is what turns
+    // the foreign key's `D1_ERROR` into a field the studio can go and fix.
+    const media = await readMedia(this.db);
+    const problems = [
+      ...checkContent(content),
+      ...checkImagesInStorage(content, media.map((entry) => entry.key)),
+    ];
     if (problems.length > 0) {
       const noun = problems.length === 1 ? 'field needs' : 'fields need';
       throw ApiException.unprocessable(
@@ -42,8 +50,10 @@ export class ContentService {
     try {
       await writeContent(this.db, content);
     } catch (error) {
-      // A shape the validator accepts but the schema refuses — a missing media
-      // row behind an image, most likely. Worth the real message.
+      // A shape both gates accept and the schema still refuses. The missing
+      // photograph — by far the likeliest — is caught above with a field name
+      // on it, so anything reaching here is a constraint nobody predicted and
+      // the real message is the most useful thing to say about it.
       throw ApiException.badRequest(
         error instanceof Error ? error.message : 'The save was refused.',
       );

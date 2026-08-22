@@ -44,7 +44,7 @@ export function App() {
       try {
         setLogin((await sessionService.whoami())?.login ?? null);
       } catch (error) {
-        setFailure(error instanceof Error ? error.message : 'Could not reach the site.');
+        setFailure(error instanceof Error ? error.message : t('app.unreachable'));
       } finally {
         setChecking(false);
       }
@@ -60,7 +60,7 @@ export function App() {
       try {
         setLoaded(await contentService.load());
       } catch (error) {
-        setFailure(error instanceof Error ? error.message : 'Could not reach the site.');
+        setFailure(error instanceof Error ? error.message : t('app.unreachable'));
       }
     })();
   }, [login]);

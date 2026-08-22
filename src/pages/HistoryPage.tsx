@@ -36,9 +36,9 @@ export function HistoryPage({ editor }: HistoryPageProps) {
       setRevisions(await publishService.revisions());
       setFailure(null);
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : 'The history could not be read.');
+      setFailure(error instanceof Error ? error.message : t('historyPage.readFailed'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void refresh();
@@ -51,13 +51,14 @@ export function HistoryPage({ editor }: HistoryPageProps) {
       const result = await publishService.restore(id);
       setConfirming(null);
       setNotice(
-        `Revision ${result.restoredFrom ?? id} is being published again as revision ${
-          result.revision ?? '?'
-        }. The live site updates in a minute or two.`,
+        t('historyPage.restored', {
+          from: result.restoredFrom ?? id,
+          to: result.revision ?? id,
+        }),
       );
       await refresh();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'The restore failed.');
+      setNotice(error instanceof Error ? error.message : t('historyPage.restoreFailed'));
     } finally {
       setBusy(false);
     }

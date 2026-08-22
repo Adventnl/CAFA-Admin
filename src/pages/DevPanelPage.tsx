@@ -38,7 +38,7 @@ export function DevPanelPage() {
       try {
         setSpec(await connectorService.document());
       } catch (error) {
-        setFailure(error instanceof Error ? error.message : 'The API document could not be read.');
+        setFailure(error instanceof Error ? error.message : t('devPage.documentFailed'));
       }
     })();
   }, []);
@@ -139,7 +139,7 @@ function ConnectorCard({ connector, server }: ConnectorCardProps) {
       setResult({
         status: 0,
         ok: false,
-        body: error instanceof Error ? error.message : 'The request failed.',
+        body: error instanceof Error ? error.message : t('devPage.requestFailed'),
       });
     } finally {
       setBusy(false);
